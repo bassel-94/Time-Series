@@ -1,0 +1,142 @@
+---
+title: "Homework"
+author: "Bassel MASRI & Andrei CHIRITA"
+date: "1/21/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE, warning=FALSE}
+#-- clean environment and load libraries
+rm(list=ls())
+if(!require(MTS)) install.packages("MTS")
+```
+
+## Exercise 1
+
+The purpose of this exercise is to simulate a path of length $T = 100$ from the VAR(1) model : 
+
+$$
+X_t = A_n X_{t-1} + \epsilon_t
+$$
+
+Where $\epsilon_t$ is a standard multivariate gaussian white noise.
+
+To demonstrate the parameters of the problem, we will take the simple example of n=2, that is a stationary bivariate VAR(1) model which has the following form :
+
+$$
+\left(\begin{array}{cc} 
+X_{1t}\\ 
+X_{2t}
+\end{array}\right)
+= 
+\left(\begin{array}{cc} 
+c_1\\ 
+c_2
+\end{array}\right)
++
+\left(\begin{array}{cc} 
+A_{1,1} & A_{1,2}\\ 
+A_{2,1} & A_{2,2}
+\end{array}\right)
+\times
+\left(\begin{array}{cc} 
+X_{1t-1} \\ 
+X_{2t-1}
+\end{array}\right)
++
+\left(\begin{array}{cc} 
+\epsilon_{1t} \\ 
+\epsilon_{2t}
+\end{array}\right)
+
+$$ 
+In our case, since $A_{n}(i,i) = \frac{1}{2}$ and $A_{n}(i,i+1) = \frac{1}{5}$, we have the following model that we need to estimate : 
+
+$$
+\left(\begin{array}{cc} 
+X_{1t}\\ 
+X_{2t}
+\end{array}\right)
+= 
+\left(\begin{array}{cc} 
+c_1\\ 
+c_2
+\end{array}\right)
++
+\left(\begin{array}{cc} 
+0.5 & 0.2\\ 
+0 & 0.5
+\end{array}\right)
+\times
+\left(\begin{array}{cc} 
+X_{1t-1} \\ 
+X_{2t-1}
+\end{array}\right)
++
+\left(\begin{array}{cc} 
+\epsilon_{1t} \\ 
+\epsilon_{2t}
+\end{array}\right)
+
+$$ 
+
+The steps are :
+
+* Define the parameters of the problem (T and n)
+* Generate VAR(1) model
+* Estimate VAR(1) model
+* Calculate error on the estimated VAR(1) model.
+
+```{r}
+#-- define function that simulates var models
+
+simulate_var = function(n, T) {
+  error=rep(0, length(n))
+  
+  for (l in seq_along(n)){
+    p=n[l]
+    A=0.5*diag(p)
+    X=matrix(0,nrow=p ,ncol=T)
+    
+    for (i in 1:(p-1)){
+      A[i,i+1]=0.2
+    }
+    
+    #-- Generate a VAR(1) model of dimension l with T=100 observations
+    for (j in 2:T){
+      X[,j]=A%*%X[,(j-1)]+t(t(rnorm(p)))
+    }
+    
+    #-- Estimate a VAR(1) model of dimension l from T=100 observations
+    Estim=VAR(t(X),1)
+    A_hat=Estim$Phi
+    
+    #-- Study the estimation error
+    B=A_hat-A
+    error[l]=sqrt(max(abs(eigen(t(B)%*%B)$values)))
+  }
+  plot(error, type = 'b', lwd = 2, 
+       xlab = "Values of n", ylab = "Error", axes = FALSE,
+       main = "Estimation error of different values of n")
+  axis(1, at=1:4, lab=c("n = 2", "n = 5", "n = 10", "n = 20"))
+  axis(2)
+  box()
+}
+```
+
+```{r}
+#-- test for T=100
+simulate_var(c(2,5,10,20),100)
+
+#-- test for T=500
+simulate_var(c(2,5,10,20),500)
+
+#-- test for T=1000
+simulate_var(c(2,5,10,20),1000)
+```
+
+## Exercise 2 
