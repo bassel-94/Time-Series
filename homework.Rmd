@@ -91,7 +91,7 @@ The steps are :
 * Estimate VAR(1) model
 * Calculate error on the estimated VAR(1) model.
 
-```{r}
+```{r, include=FALSE}
 #-- define function that simulates var models
 
 simulate_var = function(n, T) {
@@ -106,12 +106,12 @@ simulate_var = function(n, T) {
       A[i,i+1]=0.2
     }
     
-    #-- Generate a VAR(1) model of dimension l with T=100 observations
+    #-- Generate a VAR(1) model of dimension l with T observations
     for (j in 2:T){
       X[,j]=A%*%X[,(j-1)]+t(t(rnorm(p)))
     }
     
-    #-- Estimate a VAR(1) model of dimension l from T=100 observations
+    #-- Estimate a VAR(1) model of dimension l from T observations
     Estim=VAR(t(X),1)
     A_hat=Estim$Phi
     
@@ -119,24 +119,27 @@ simulate_var = function(n, T) {
     B=A_hat-A
     error[l]=sqrt(max(abs(eigen(t(B)%*%B)$values)))
   }
-  plot(error, type = 'b', lwd = 2, 
+  p = plot(error, type = 'b', lwd = 2, 
        xlab = "Values of n", ylab = "Error", axes = FALSE,
-       main = "Estimation error of different values of n")
+       main = paste("Estimation error of different values of n with T=",T))
   axis(1, at=1:4, lab=c("n = 2", "n = 5", "n = 10", "n = 20"))
   axis(2)
   box()
+  return(p)
 }
 ```
 
-```{r}
+```{r, warning=FALSE, include=FALSE}
 #-- test for T=100
-simulate_var(c(2,5,10,20),100)
-
+a = simulate_var(c(2,5,10,20),100)
+lines(simulate_var(c(2,5,10,20),500))
 #-- test for T=500
-simulate_var(c(2,5,10,20),500)
+
 
 #-- test for T=1000
 simulate_var(c(2,5,10,20),1000)
 ```
+
+When the model has more information it can handle more variables (lower error). and differences between errors of n=2 and n=20 is smaller.
 
 ## Exercise 2 
