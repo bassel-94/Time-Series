@@ -9,10 +9,12 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, include = FALSE, warning=FALSE}
+```{r, include = FALSE, warning=FALSE, echo=FALSE}
 #-- clean environment and load libraries
 rm(list=ls())
 if(!require(MTS)) install.packages("MTS")
+library(ggplot2)
+library(tidyverse)
 ```
 
 ## Exercise 1
@@ -25,15 +27,15 @@ $$
 
 Where $\epsilon_t$ is a standard multivariate gaussian white noise.
 
-To demonstrate the parameters of the problem, we will take the simple example of n=2, that is a stationary bivariate VAR(1) model which has the following form :
+To demonstrate the parameters of the problem, we will take the simple example of $n=2$, that is a stationary bivariate VAR(1) model which has the following form :
 
 $$
-\left(\begin{array}{cc} 
+\left(\begin{array}{c} 
 X_{1t}\\ 
 X_{2t}
 \end{array}\right)
 = 
-\left(\begin{array}{cc} 
+\left(\begin{array}{c} 
 c_1\\ 
 c_2
 \end{array}\right)
@@ -43,18 +45,17 @@ A_{1,1} & A_{1,2}\\
 A_{2,1} & A_{2,2}
 \end{array}\right)
 \times
-\left(\begin{array}{cc} 
+\left(\begin{array}{c} 
 X_{1t-1} \\ 
 X_{2t-1}
 \end{array}\right)
 +
-\left(\begin{array}{cc} 
+\left(\begin{array}{c} 
 \epsilon_{1t} \\ 
 \epsilon_{2t}
 \end{array}\right)
-
 $$ 
-In our case, since $A_{n}(i,i) = \frac{1}{2}$ and $A_{n}(i,i+1) = \frac{1}{5}$, we have the following model that we need to estimate : 
+In our case, we have the following parameters; $A_{n}(i,i) = \frac{1}{2}$, $A_{n}(i,i+1) = \frac{1}{5}$, and $A_{n}(i,j) = 0$. For the specific case of $n=2$, this enables us to rewrite the model that we need to estimate as follows:
 
 $$
 \left(\begin{array}{cc} 
@@ -81,20 +82,23 @@ X_{2t-1}
 \epsilon_{1t} \\ 
 \epsilon_{2t}
 \end{array}\right)
-
 $$ 
 
 The steps are :
 
-* Define the parameters of the problem (T and n)
+* Define the parameters of the problem
 * Generate VAR(1) model
 * Estimate VAR(1) model
 * Calculate error on the estimated VAR(1) model.
 
-```{r, include=FALSE}
-#-- define function that simulates var models
+We will compute the above steps using the following code chunk:
 
+```{r}
+#-- define function that simulates var models
 simulate_var = function(n, T) {
+  
+  #-- set seed for reproducible results
+  set.seed(123)
   error=rep(0, length(n))
   
   for (l in seq_along(n)){
@@ -106,12 +110,12 @@ simulate_var = function(n, T) {
       A[i,i+1]=0.2
     }
     
-    #-- Generate a VAR(1) model of dimension l with T observations
+    #-- Generate a VAR model of dimension n[l] with T obs
     for (j in 2:T){
       X[,j]=A%*%X[,(j-1)]+t(t(rnorm(p)))
     }
     
-    #-- Estimate a VAR(1) model of dimension l from T observations
+    #-- Estimate a VAR model of dimension n[l] from T obs
     Estim=VAR(t(X),1)
     A_hat=Estim$Phi
     
@@ -119,27 +123,46 @@ simulate_var = function(n, T) {
     B=A_hat-A
     error[l]=sqrt(max(abs(eigen(t(B)%*%B)$values)))
   }
-  p = plot(error, type = 'b', lwd = 2, 
-       xlab = "Values of n", ylab = "Error", axes = FALSE,
-       main = paste("Estimation error of different values of n with T=",T))
-  axis(1, at=1:4, lab=c("n = 2", "n = 5", "n = 10", "n = 20"))
-  axis(2)
-  box()
-  return(p)
+  return(error)
 }
 ```
 
 ```{r, warning=FALSE, include=FALSE}
-#-- test for T=100
-a = simulate_var(c(2,5,10,20),100)
-lines(simulate_var(c(2,5,10,20),500))
-#-- test for T=500
-
-
-#-- test for T=1000
-simulate_var(c(2,5,10,20),1000)
+#-- test for T=c(100,200,1000)
+n = c(2,5,10,20)
+error_T100 = simulate_var(n,100)
+error_T500 = simulate_var(n,200)
+error_T1000 = simulate_var(n,1000)
 ```
 
-When the model has more information it can handle more variables (lower error). and differences between errors of n=2 and n=20 is smaller.
+```{r, include=FALSE, echo = FALSE}
+#-- group results in a data frame and produce a column of indices to plot against
+df = data.frame("T_100" = error_T100, 
+                "T_500" = error_T500, 
+                "T_1000" = error_T1000) %>% 
+  rowid_to_column() %>%
+  gather(key = "T_values", value = "Errors", -rowid)
+```
+
+We then compute the error $n=\{2,5,10,20\}$ for the following path lengths; $T=\{100,500,1000\}$ and we get the following plot: 
+
+```{r, echo=FALSE,fig.align='center', fig.width=4, fig.height=3, fig.cap="The variation of error as a function of simulation length T and number of covariates n"}
+#-- plot results
+ggplot(df, aes(x=rowid, y = Errors, color = T_values)) + 
+  geom_line() + geom_point() + theme_bw() + 
+  ggtitle("Errors as a function of T and n") + 
+  scale_x_discrete(name ="Values of n", limits=c("2","5","10", "20")) +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.6), 
+        legend.title = element_text(size = 8, face = "bold"),
+        legend.text = element_text(size = 6),
+        axis.text=element_text(size=6),
+        axis.title=element_text(size=8,face="bold"))
+```
+
+Upon examining the plot of the squared $\ell_2$ error term, we notice a consistent increase in the error with respect to the numbers of covariates. When n becomes large, the error value increases. This is expected because the more covariates we have to estimate, the more error we introduce in the model. 
+
+As for the path length $T$, we notice that the smallest error values are for path $T=1000$. This is due to the fact that we have more observations in the time series that enables us to estimate the coefficients more accuratly. To put differently, with more *information* to estimate the model's parameters, we are able to achieve more accurate results.
+
+\newpage
 
 ## Exercise 2 
