@@ -10,11 +10,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, include = FALSE, warning=FALSE, echo=FALSE}
+#https://fred.stlouisfed.org/series/CPIAUCNS
 #-- clean environment and load libraries
 rm(list=ls())
 if(!require(MTS)) install.packages("MTS")
 library(ggplot2)
 library(tidyverse)
+library(zoo)
 ```
 
 ## Exercise 1
@@ -166,3 +168,86 @@ As for the path length $T$, we notice that the smallest error values are for pat
 \newpage
 
 ## Exercise 2 
+
+```{r}
+data<-read.csv("serie completa.csv",sep=",",header=TRUE)
+dates <- seq(ISOdate(1994,4,1), by = "month", length.out = 321)
+data$Date<-dates
+CPI<-read.csv("CPIAUCNS.csv",sep=",",header=TRUE)
+```
+```{r}
+CPI1<-data.frame(DATE=CPI[,1],CPI[,2]/CPI[1,2])
+CPI1
+```
+```{r}
+data2<-reshape(data, 
+        direction = "long",
+        varying = list(names(data)[2:4]),
+        v.names = "Value",
+        idvar = c("Date"),
+        timevar = "Type",
+        times = c("Diesel","Gasoline","Crude"))
+data2<-data.frame(data2,year=as.numeric(format(as.Date(data2$Date, format="%d/%m/%Y"),"%Y")))
+ggplot(data2[data2$Type=="Crude",])+
+  aes(x=as.factor(year),y=Value)+
+  geom_boxplot()+
+  stat_summary(fun=median, geom="smooth", aes(group=1))+
+  ggtitle("Yearly Evolution of Crude Oil Prices")+
+  xlab("Year")+
+  ylab("Price in dolars")
+```
+
+## Adjusting for inflation
+```{r}
+data3<-data.frame(Date=data$Date,
+                 Diesel=data$U.S..No.2.Diesel.Retail.Prices..Dollars.per.Gallon./CPI1[,2],
+                 Gasoline=data$U.S..All.Grades.All.Formulations.Retail.Gasoline.Prices..Dollars.per.Gallon./CPI1[,2],
+                 Crude=data$Cushing..OK.WTI.Spot.Price.FOB..Dollars.per.Barrel./CPI1[,2])
+data3
+```
+```{r}
+data4<-reshape(data3, 
+        direction = "long",
+        varying = list(names(data3)[2:4]),
+        v.names = "Value",
+        idvar = c("Date"),
+        timevar = "Type",
+        times = c("Diesel","Gasoline","Crude"))
+data4<-data.frame(data4,year=as.numeric(format(as.Date(data4$Date, format="%d/%m/%Y"),"%Y")))
+ggplot(data4[data4$Type=="Crude",])+
+  aes(x=as.factor(year),y=Value)+
+  geom_boxplot()+
+  stat_summary(fun=median, geom="smooth", aes(group=1))+
+  ggtitle("Yearly Evolution of Crude Oil Prices",subtitle = "Adjusted for inflation")+
+  xlab("Year")+
+  ylab("Price in dolars (1994)")
+```
+```{r}
+par(mfrow=c(1,2))
+ggplot(data4[data4$Type=="Diesel"|data4$Type=="Gasoline",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Evolution of Retail Prices of Diesel and Gasoline",subtitle = "Adjusted for inflation")+
+  xlab("Year")+
+  ylab("Price in dolars (1994)")
+ggplot(data4[data4$Type=="Crude",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Crude Oil Prices",subtitle = "Adjusted for inflation")+
+  xlab("Year")+
+  ylab("Price in dolars (1994)")+
+  geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue")
+```
+
+## Check Seasonality
+
+```{r}
+data4<-data.frame(data4,month=as.numeric(format(as.Date(data4$Date, format="%d/%m/%Y"),"%m")))
+ggplot(data4[data4$Type=="Crude",])+
+  aes(x=as.factor(month),y=Value)+
+  geom_boxplot()+
+  stat_summary(fun=median, geom="smooth", aes(group=1))+
+  ggtitle("Monthly oil prices",subtitle = "Adjusted for inflation")+
+  xlab("Month")+
+  ylab("Price in dolars (1994)")
+```
