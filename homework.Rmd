@@ -173,20 +173,26 @@ As for the path length $T$, we notice that the smallest error values are for pat
 data<-read.csv("serie completa.csv",sep=",",header=TRUE)
 dates <- seq(ISOdate(1994,4,1), by = "month", length.out = 321)
 data$Date<-dates
+data<-data[-321,]
 CPI<-read.csv("CPIAUCNS.csv",sep=",",header=TRUE)
+CPI<-CPI[-321,]
+Road_travel<-read.csv("TRFVOLUSM227NFWA.csv")
 ```
 ```{r}
 CPI1<-data.frame(DATE=CPI[,1],CPI[,2]/CPI[1,2])
 CPI1
 ```
 ```{r}
+data<-data.frame(data,Miles_Travelled=Road_travel[,2])
+```
+```{r}
 data2<-reshape(data, 
         direction = "long",
-        varying = list(names(data)[2:4]),
+        varying = list(names(data)[2:5]),
         v.names = "Value",
         idvar = c("Date"),
         timevar = "Type",
-        times = c("Diesel","Gasoline","Crude"))
+        times = c("Diesel","Gasoline","Crude","Miles"))
 data2<-data.frame(data2,year=as.numeric(format(as.Date(data2$Date, format="%d/%m/%Y"),"%Y")))
 ggplot(data2[data2$Type=="Crude",])+
   aes(x=as.factor(year),y=Value)+
@@ -195,6 +201,13 @@ ggplot(data2[data2$Type=="Crude",])+
   ggtitle("Yearly Evolution of Crude Oil Prices")+
   xlab("Year")+
   ylab("Price in dolars")
+ggplot(data2[data2$Type=="Miles",])+
+  aes(x=as.factor(year),y=Value)+
+  geom_boxplot()+
+  stat_summary(fun=median, geom="smooth", aes(group=1))+
+  ggtitle("Yearly Evolution of Miles Travelled per Month")+
+  xlab("Year")+
+  ylab("Miles")
 ```
 
 ## Adjusting for inflation
@@ -202,17 +215,18 @@ ggplot(data2[data2$Type=="Crude",])+
 data3<-data.frame(Date=data$Date,
                  Diesel=data$U.S..No.2.Diesel.Retail.Prices..Dollars.per.Gallon./CPI1[,2],
                  Gasoline=data$U.S..All.Grades.All.Formulations.Retail.Gasoline.Prices..Dollars.per.Gallon./CPI1[,2],
-                 Crude=data$Cushing..OK.WTI.Spot.Price.FOB..Dollars.per.Barrel./CPI1[,2])
+                 Crude=data$Cushing..OK.WTI.Spot.Price.FOB..Dollars.per.Barrel./CPI1[,2],
+                 Miles=data$Miles_Travelled)
 data3
 ```
 ```{r}
 data4<-reshape(data3, 
         direction = "long",
-        varying = list(names(data3)[2:4]),
+        varying = list(names(data3)[2:5]),
         v.names = "Value",
         idvar = c("Date"),
         timevar = "Type",
-        times = c("Diesel","Gasoline","Crude"))
+        times = c("Diesel","Gasoline","Crude","Miles"))
 data4<-data.frame(data4,year=as.numeric(format(as.Date(data4$Date, format="%d/%m/%Y"),"%Y")))
 ggplot(data4[data4$Type=="Crude",])+
   aes(x=as.factor(year),y=Value)+
@@ -237,6 +251,13 @@ ggplot(data4[data4$Type=="Crude",])+
   xlab("Year")+
   ylab("Price in dolars (1994)")+
   geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue")
+ggplot(data4[data4$Type=="Miles",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Miles Travelled per Month")+
+  xlab("Year")+
+  ylab("Miles")+
+  geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue")
 ```
 
 ## Check Seasonality
@@ -250,4 +271,11 @@ ggplot(data4[data4$Type=="Crude",])+
   ggtitle("Monthly oil prices",subtitle = "Adjusted for inflation")+
   xlab("Month")+
   ylab("Price in dolars (1994)")
+ggplot(data4[data4$Type=="Miles",])+
+  aes(x=as.factor(month),y=Value)+
+  geom_boxplot()+
+  stat_summary(fun=median, geom="smooth", aes(group=1))+
+  ggtitle("Monthly Miles Travelled")+
+  xlab("Month")+
+  ylab("Miles Travelled")
 ```
