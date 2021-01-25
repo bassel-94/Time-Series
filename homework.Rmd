@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, include = FALSE, warning=FALSE, echo=FALSE}
 #https://fred.stlouisfed.org/series/CPIAUCNS
+#https://fred.stlouisfed.org/series/TRFVOLUSM227NFWA
 #-- clean environment and load libraries
 rm(list=ls())
 if(!require(MTS)) install.packages("MTS")
@@ -18,8 +19,12 @@ library(ggplot2)
 library(tidyverse)
 library(zoo)
 ```
-
-## Exercise 1
+\newpage
+\setcounter{tocdepth}{2}
+\pagenumbering{arabic}
+\tableofcontents
+\newpage
+# Exercise 1
 
 The purpose of this exercise is to simulate a path of length $T = 100$ from the VAR(1) model : 
 
@@ -167,7 +172,33 @@ As for the path length $T$, we notice that the smallest error values are for pat
 
 \newpage
 
-## Exercise 2 
+# Exercise 2 
+
+## Goal of the Analysis
+
+Our analysis has as purpose to find out what are the main influences on gasoline prices. More specifically we try to put the evolution of gasoline prices in the last 26 year in the context of 2 indicators: the vehicle related mobility and crude oil prices.
+
+In order to do that we use monthly data from the United States. We chose monthly data because it is easier to interpret in economically. We decided on using data from the United States because the U.S.A. is the largest economy in the world and one of the largest crude oil producers and special rules around the export of oil products. Thus we can consider that the U.S. has an oil economy that is both U.S.A.-centered and at the same time representative of worldwide trends in oil and gasoline prices. 
+
+## Description of the data
+
+During our analysis we use 5 time series, 4 related to the evolution of the prices and consumption and gasoline and diesel in the United States of America and 1 general economic indicator (The CPI). The series are:
+
+* U.S. All Grades All Formulations Retail Gasoline Prices (referred bellow as gasoline prices): It is a general value of gasoline prices in the United States, the series is downloaded from the U.S. Energy Information Administration (EIA). The values of this series are expressed in Dollars per Gallon.
+
+* U.S. No 2 Diesel Retail Prices (referred bellow as diesel prices): It is a general value of diesel prices in the United States, the series is downloaded from EIA. The values of the series are expressed in Dollars per Gallon.
+
+* Cushing, OK WTI Spot Price FOB (referred bellow as crude oil price): It is a general value of the price of crude oil in the United States, the series is downloaded from EIA and its values are expressed in Dollars per Barrel.
+
+* Vehicle Miles Traveled: It represents a measure of the vehicle-related mobility in the United States, the series is downloaded from the site of the Federal Reserve Bank of St. Louis. The unit of measurement is: millions of miles.
+
+* Consumer Price Index for All Urban Consumers: All Items in U.S. City Average: This is a measure of CPI, the downloaded data is an index with the base in the early 1980's. We needed this series because we are dealing with prices that need to be adjusted with inflation in order to allow for comparisons between distant time periods. This series was downloaded from the site of the Federal Reserve Bank of the United States.
+
+## Loading and Preparing the Data
+
+On the first step we had to load the data from the csv files it was stored on. Then we made sure that the dates are expressed in a format that was comprehensible for R.
+On this step we also re-expressed the CPI in order for it's base to be the month of April of 1994. The change of basis was done by dividing all the values in the CPI series with the value for April 1994.
+Next we "assembled the data sets" and extracted the year for plotting, we also reshaped the data in a long format, again for plotting purposes.
 
 ```{r}
 data<-read.csv("serie completa.csv",sep=",",header=TRUE)
@@ -180,7 +211,6 @@ Road_travel<-read.csv("TRFVOLUSM227NFWA.csv")
 ```
 ```{r}
 CPI1<-data.frame(DATE=CPI[,1],CPI[,2]/CPI[1,2])
-CPI1
 ```
 ```{r}
 data<-data.frame(data,Miles_Travelled=Road_travel[,2])
@@ -193,7 +223,20 @@ data2<-reshape(data,
         idvar = c("Date"),
         timevar = "Type",
         times = c("Diesel","Gasoline","Crude","Miles"))
-data2<-data.frame(data2,year=as.numeric(format(as.Date(data2$Date, format="%d/%m/%Y"),"%Y")))
+years=as.numeric(format(as.Date(data2$Date, format="%d/%m/%Y"),"%Y"))
+years<-substr(years,3,4)
+years<-factor(years,levels = c("94","95","96","97","98","99","00",
+                               "01","02","03","04","05","06","07","08","09",
+                               "10","11","12","13","14","15","16","17","18","19","20"))
+data2<-data.frame(data2,year=years)
+```
+
+## Yearly and Monthly Evolution of the Series
+
+### Yearly Evolution
+
+```{r}
+par(mfrow=c(1,2))
 ggplot(data2[data2$Type=="Crude",])+
   aes(x=as.factor(year),y=Value)+
   geom_boxplot()+
@@ -209,8 +252,40 @@ ggplot(data2[data2$Type=="Miles",])+
   xlab("Year")+
   ylab("Miles")
 ```
+The plots above show the values for each year as boxplots with the blue line uniting the medians of each year. For the crude oil prices we can observe that prices increased steadily from 2003 to 2008 when they had a sudden drop due to the financial and economic crisis of that year. Recovery was fast and from 2011 to 2014 prices remained on a plateau just bellow 100$ per barrel. In 2015 prices declined again, but this time the recovery was sower and was also interrupted by the COVID-19 pandemic. From the point of view of variability three years stand out 2007, 2008 and 2009, this are years when the price grew and declined very rapidly. The number of miles traveled per month had a similar variability each year and most years also have an extreme low-value. The series has an ascending trend that was "smoothed" by the crisis of 2008 and somewhat reversed (probably temporarily) by the Covid-19 pandemic.
+
+### Monthly Evolution
+
+In the following plots we can observe the monthly evolution of the data sets, we had to plot them separately because of the different units of measurement. The evolution of diesel and gasoline prices was very similar and it basically followed he same movement trajectory as that of the crude oil.
+On the plot of the prices of crude oil  we added a blue line representing a moving average with basis 12. It has a very similar trajectory as the un-smoothed series. Fo the traveled miles data we can observe a clear seasonality with travel declining around February, in this case smoothing using moving averages has a greater impact allowing us to see the trend.
+```{r}
+par(mfrow=c(1,2))
+ggplot(data2[data2$Type=="Diesel"|data2$Type=="Gasoline",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Evolution of Retail Prices of Diesel and Gasoline",subtitle = "Adjusted for inflation")+
+  xlab("Year")+
+  ylab("Price in dolars (1994)")
+ggplot(data2[data2$Type=="Crude",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Crude Oil Prices",subtitle = "Adjusted for inflation")+
+  xlab("Year")+
+  ylab("Price in dolars (1994)")+
+  geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue")
+ggplot(data2[data2$Type=="Miles",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Miles Travelled per Month")+
+  xlab("Year")+
+  ylab("Miles")+
+  geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue")
+```
+
 
 ## Adjusting for inflation
+
+The next step of our analysis was to adjust the series for inflation. We had to do that in order to make the prices of different time periods comparable as inflation can induce a trend where there is actually none. The adjustment was done by dividing the price time series by the index of the CPI corresponding to each month. The basis for the adjustment was the month of April of 1994.
 ```{r}
 data3<-data.frame(Date=data$Date,
                  Diesel=data$U.S..No.2.Diesel.Retail.Prices..Dollars.per.Gallon./CPI1[,2],
@@ -219,6 +294,12 @@ data3<-data.frame(Date=data$Date,
                  Miles=data$Miles_Travelled)
 data3
 ```
+
+## Yearly and Monthly Evolution for Inflation Adjusted Series
+
+### Yearly Evolution
+
+The yearly evolution of adjusted for inflation crude prices was similar to the one unadjusted but the prices in the last years of the series are lower (and thus closer to the ones of the first years). Thus we can observe on this serie that cruse prices went from just bellow 25 doars in the 1990's to basically the same level today with much higher prices in between.
 ```{r}
 data4<-reshape(data3, 
         direction = "long",
@@ -251,17 +332,12 @@ ggplot(data4[data4$Type=="Crude",])+
   xlab("Year")+
   ylab("Price in dolars (1994)")+
   geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue")
-ggplot(data4[data4$Type=="Miles",])+
-  aes(x=Date,y=Value,colour=Type)+
-  geom_line()+
-  ggtitle("Miles Travelled per Month")+
-  xlab("Year")+
-  ylab("Miles")+
-  geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue")
 ```
 
 ## Check Seasonality
 
+One important step in time series analysis is the checking of seasonality. In order to do that we will plot the average value of the series for each month (and then for each season).
+The oil price series (bellow) has similar mean values for each month with a higher variability in summer months. But by the look of the plot there is a small chance that it would have a trend.
 ```{r}
 data4<-data.frame(data4,month=as.numeric(format(as.Date(data4$Date, format="%d/%m/%Y"),"%m")))
 ggplot(data4[data4$Type=="Crude",])+
@@ -271,10 +347,62 @@ ggplot(data4[data4$Type=="Crude",])+
   ggtitle("Monthly oil prices",subtitle = "Adjusted for inflation")+
   xlab("Month")+
   ylab("Price in dolars (1994)")
+```
+The number of miles traveled data  does seem to have a monthly trend based on the values of the medians with a sharp decrease in the month of February. We will also try to plot the per season data.
+```{r}
 ggplot(data4[data4$Type=="Miles",])+
   aes(x=as.factor(month),y=Value)+
   geom_boxplot()+
   stat_summary(fun=median, geom="smooth", aes(group=1))+
+  ggtitle("Monthly Miles Travelled")+
+  xlab("Month")+
+  ylab("Miles Travelled")
+```
+
+```{r}
+for ( i in 1:nrow(data4)){
+  if(data4$month[i] %in% c(12,1,2)){
+  data4$season[i]<-"winter"
+}
+if (data4$month[i] %in% c(3,4,5)){
+  data4$season[i]<-"spring"
+}
+if(data4$month[i] %in% c(6,7,8)){
+  data4$season[i]<-"summer"
+}
+if (data4$month[i] %in% c(9,10,11)){
+  data4$season[i]<-"autumn"
+}
+}
+
+ggplot(data4[data4$Type=="Miles",])+
+  aes(x=as.factor(season),y=Value)+
+  geom_boxplot()+
+  stat_summary(fun=median, geom="smooth", aes(group=1))+
+  ggtitle("Monthly Miles Travelled")+
+  xlab("Month")+
+  ylab("Miles Travelled")
+```
+
+```{r} 
+# The code needs to be re-done
+data4$s_index<--1
+data4$s_mean<--1
+data4[data4$season=="winter"&data4$Type=="Miles",]$s_index<-1:nrow(data4[data4$season=="winter"&data4$Type=="Miles",])
+data4[data4$season=="winter"&data4$Type=="Miles",]$s_mean<-mean(data4[data4$season=="winter"&data4$Type=="Miles","Value"])
+i<-nrow(data4[data4$season=="winter"&data4$Type=="Miles",])
+data4[data4$season=="spring"&data4$Type=="Miles",]$s_index<-(i+1):(i+nrow(data4[data4$season=="spring"&data4$Type=="Miles",]))
+data4[data4$season=="spring"&data4$Type=="Miles",]$s_mean<-mean(data4[data4$season=="spring"&data4$Type=="Miles","Value"])
+i<-nrow(data4[data4$season=="winter"&data4$Type=="Miles",])+nrow(data4[data4$season=="spring"&data4$Type=="Miles",])
+data4[data4$season=="summer"&data4$Type=="Miles",]$s_index<-(i+1):(i+nrow(data4[data4$season=="summer"&data4$Type=="Miles",]))
+data4[data4$season=="summer"&data4$Type=="Miles",]$s_mean<-mean(data4[data4$season=="summer"&data4$Type=="Miles","Value"])
+i<-nrow(data4[data4$season=="winter"&data4$Type=="Miles",])+nrow(data4[data4$season=="spring"&data4$Type=="Miles",])+nrow(data4[data4$season=="summer"&data4$Type=="Miles",])
+data4[data4$season=="autumn"&data4$Type=="Miles",]$s_index<-(i+1):(i+nrow(data4[data4$season=="autumn"&data4$Type=="Miles",]))
+data4[data4$season=="autumn"&data4$Type=="Miles",]$s_mean<-mean(data4[data4$season=="autumn"&data4$Type=="Miles","Value"])
+ggplot(data4[data4$Type=="Miles"&data4$Type=="Miles",])+
+  aes(x=s_index,y=Value,colour=season)+
+  geom_line()+
+  geom_line(aes(x=s_index,y=s_mean,colour=season))+
   ggtitle("Monthly Miles Travelled")+
   xlab("Month")+
   ylab("Miles Travelled")
