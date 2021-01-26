@@ -18,6 +18,7 @@ if(!require(MTS)) install.packages("MTS")
 library(ggplot2)
 library(tidyverse)
 library(zoo)
+library(tseries)
 ```
 \newpage
 \setcounter{tocdepth}{2}
@@ -385,25 +386,95 @@ ggplot(data4[data4$Type=="Miles",])+
 ```
 
 ```{r} 
-# The code needs to be re-done
-data4$s_index<--1
-data4$s_mean<--1
-data4[data4$season=="winter"&data4$Type=="Miles",]$s_index<-1:nrow(data4[data4$season=="winter"&data4$Type=="Miles",])
-data4[data4$season=="winter"&data4$Type=="Miles",]$s_mean<-mean(data4[data4$season=="winter"&data4$Type=="Miles","Value"])
-i<-nrow(data4[data4$season=="winter"&data4$Type=="Miles",])
-data4[data4$season=="spring"&data4$Type=="Miles",]$s_index<-(i+1):(i+nrow(data4[data4$season=="spring"&data4$Type=="Miles",]))
-data4[data4$season=="spring"&data4$Type=="Miles",]$s_mean<-mean(data4[data4$season=="spring"&data4$Type=="Miles","Value"])
-i<-nrow(data4[data4$season=="winter"&data4$Type=="Miles",])+nrow(data4[data4$season=="spring"&data4$Type=="Miles",])
-data4[data4$season=="summer"&data4$Type=="Miles",]$s_index<-(i+1):(i+nrow(data4[data4$season=="summer"&data4$Type=="Miles",]))
-data4[data4$season=="summer"&data4$Type=="Miles",]$s_mean<-mean(data4[data4$season=="summer"&data4$Type=="Miles","Value"])
-i<-nrow(data4[data4$season=="winter"&data4$Type=="Miles",])+nrow(data4[data4$season=="spring"&data4$Type=="Miles",])+nrow(data4[data4$season=="summer"&data4$Type=="Miles",])
-data4[data4$season=="autumn"&data4$Type=="Miles",]$s_index<-(i+1):(i+nrow(data4[data4$season=="autumn"&data4$Type=="Miles",]))
-data4[data4$season=="autumn"&data4$Type=="Miles",]$s_mean<-mean(data4[data4$season=="autumn"&data4$Type=="Miles","Value"])
-ggplot(data4[data4$Type=="Miles"&data4$Type=="Miles",])+
+to_plot<-aggregate(Value~Type+year+season,data=data4,mean)
+to_plot$means<--1
+to_plot$s_index<-0
+season<-c("winter","spring","summer","autumn")
+for (i in unique(to_plot$Type)){
+  for (j in unique(season)){
+    to_plot[to_plot$Type==i&to_plot$season==j,]$means<-mean(to_plot[to_plot$Type==i&to_plot$season==j,"Value"])
+    to_plot[to_plot$Type==i&to_plot$season==j,]$s_index<-(max(to_plot[to_plot$Type==i,"s_index"])+1):(max(to_plot[to_plot$Type==i,"s_index"])+nrow(to_plot[to_plot$Type==i&to_plot$season==j,]))
+  }
+}
+ggplot(to_plot[to_plot$Type=="Miles",])+
   aes(x=s_index,y=Value,colour=season)+
   geom_line()+
-  geom_line(aes(x=s_index,y=s_mean,colour=season))+
+  geom_line(aes(y=means,colour=season))+
   ggtitle("Monthly Miles Travelled")+
   xlab("Month")+
   ylab("Miles Travelled")
+```
+
+```{r}
+RA_Miles<-rollmean(data3$Miles,12)
+```
+
+## Checking for Autocorrelation
+
+### Autocorrelation
+
+```{r}
+par(mfrow=c(2,2))
+for (i in 2:ncol(data3)){
+  acf(data3[,i],main=NA)
+  title(colnames(data3)[i], line = 0.5)
+}
+acf(RA_Miles)
+```
+
+### Partial Autocorrelation
+
+```{r}
+par(mfrow=c(2,2))
+for (i in 2:ncol(data3)){
+  pacf(data3[,i],main=NA)
+  title(colnames(data3)[i], line = 0.5)
+}
+```
+
+### Augumented Dickey-Fuller Test
+
+```{r}
+??adf.test
+for (i in 2:ncol(data3)){
+  print(paste("Augmented Dickey-Fuller test for ",colnames(data3)[i]," data: "))
+  print(adf.test(data3[,i],alternative="stationary",k=1))
+  
+}
+print(paste("Augmented Dickey-Fuller test for RA_Miles data: "))
+print(adf.test(RA_Miles,alternative="stationary",k=1))
+```
+
+### Removing Stationarity
+
+```{r}
+data5<-data.frame(Date=1:319)
+data5$Date<-data3$Date[-1]
+data5<-data.frame(data5,apply(data3[,2:4],MARGIN = 2,FUN = diff))
+par(mfrow=c(2,2))
+RA_Miles_stat<-diff(RA_Miles)
+for (i in 2:ncol(data5)){
+  acf(data5[,i],main=NA)
+  title(colnames(data5)[i], line = 0.5)
+}
+acf(RA_Miles_stat,main=NA)
+title("RA_Miles_stat", line = 0.5)
+```
+
+## Fitting ARMA Models
+
+### Diesel
+
+```{r}
+errors<-data.frame(AR=1,MA=1,ERR=1)
+k<-1
+for (i in 1:5){
+  for(j in 1:5){
+    model<-arma(data5$Diesel,lag=list(ar=c(i),ma=c(j)))
+    errors[k,1]<-i
+    errors[k,2]<-j
+    errors[k,3]<-model$css
+    k<-k+1
+  }
+}
 ```
