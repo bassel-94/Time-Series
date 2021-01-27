@@ -19,6 +19,10 @@ library(ggplot2)
 library(tidyverse)
 library(zoo)
 library(tseries)
+library(dplyr)
+library(forecast)
+library(gridExtra)
+library(scales)
 ```
 \newpage
 \setcounter{tocdepth}{2}
@@ -242,8 +246,7 @@ data2<-data.frame(data2,year=years)
 The first step of our exploratory data analysis of the time series at hand is to produce a plot showing the evolution of Crude oil prices as well as the miles traveled over time.  
 
 ```{r, warning=FALSE, echo=FALSE,fig.align="center", fig.width=8, fig.height=4, fig.cap="Yearly evolution of crude oil prices and miles traveled"}
-library(gridExtra)
-library(scales)
+
 p1 = ggplot(data2[data2$Type=="Crude",])+
   aes(x=as.factor(year),y=Value)+
   geom_boxplot()+
@@ -366,24 +369,23 @@ One important step in time series analysis is the checking of seasonality. In or
 The oil price series (bellow) has similar mean values for each month with a higher variability in summer months. But by the look of the plot there is a small chance that it would have a trend.
 ```{r}
 data4<-data.frame(data4,month=as.numeric(format(as.Date(data4$Date, format="%d/%m/%Y"),"%m")))
-ggplot(data4[data4$Type=="Crude",])+
+p1 = ggplot(data4[data4$Type=="Crude",])+
   aes(x=as.factor(month),y=Value)+
   geom_boxplot()+
   stat_summary(fun=median, geom="smooth", aes(group=1))+
   ggtitle("Monthly oil prices",subtitle = "Adjusted for inflation")+
   xlab("Month")+
   ylab("Price in dolars (1994)")
-```
-The number of miles traveled data  does seem to have a monthly trend based on the values of the medians with a sharp decrease in the month of February. We will also try to plot the per season data.
-```{r}
-ggplot(data4[data4$Type=="Miles",])+
+p2 = ggplot(data4[data4$Type=="Miles",])+
   aes(x=as.factor(month),y=Value)+
   geom_boxplot()+
   stat_summary(fun=median, geom="smooth", aes(group=1))+
   ggtitle("Monthly Miles Travelled")+
   xlab("Month")+
   ylab("Miles Travelled")
+grid.arrange(p1,p2, ncol = 2)
 ```
+The number of miles traveled data  does seem to have a monthly trend based on the values of the medians with a sharp decrease in the month of February. We will also try to plot the per season data.
 
 ```{r}
 for ( i in 1:nrow(data4)){
@@ -520,7 +522,7 @@ One of the most important assumptions of any time series modeling is *random noi
 To check these assumptions, we will first plot the autocorrelation of all 4 variables of interest; Gasoline, Diesel, Miles and Crude which we can see in the figure below :
 
 ```{r, warnings = FALSE, fig.align='center', fig.width=7, fig.height=5, echo = FALSE, fig.cap="Autocorrelation of the white noise processes"}
-library(forecast)
+
 
 p1 = ggAcf(ts(d1$remainder)) + ggtitle("Autocorrelation of Crude") + theme_bw()
 p2 = ggAcf(ts(d2$remainder)) + ggtitle("Autocorrelation of Miles") + theme_bw()
@@ -532,9 +534,9 @@ grid.arrange(p1,p2,p3,p4)
 
 We can clearly discern some structure in the beginning of the autocorrelation plots of the white noise processes for each of the time series at hand. This is an indicator of non stationarity that should be handled before proceeding to do any modeling.
 
-### Autocorrelation of the covariates [maybe we can replace with this??]
+### Autocorrelation of the covariates 
 
-Similarly, we will explore the autocorrelation of each of the covariates of interest as a function of the lag. Their corresponding plots below indicate a high autocorrelation with respect to their lagg, further confirming the non stationarity found in all of the covariates.
+Similarly, we will explore the autocorrelation of each of the covariates of interest as a function of the lag. Their corresponding plots below indicate a high autocorrelation with respect to their lag, further confirming the non stationarity found in all of the covariates.
 
 ```{r, warnings = FALSE, fig.align='center', fig.width=6, fig.height=4, echo = FALSE, fig.cap="Autocorrelation of all the covariates"}
 #-- loop over the covariates and create autocorrelation plots
@@ -546,16 +548,6 @@ for (i in 2:ncol(data3)){
     theme_bw()
 }
 grid.arrange(p[[2]], p[[3]], p[[4]], p[[5]])
-```
-
-
-```{r}
-################## Maybe we can delete this ?? ###########
-par(mfrow=c(2,2))
-for (i in 2:ncol(data3)){
-  acf(data3[,i],main=NA)
-  title(colnames(data3)[i], line = 0.5)
-}
 acf(RA_Miles)
 ```
 
@@ -632,18 +624,55 @@ After examining the autocorrelation plots for the second time after differentiat
 
 ## Fitting ARMA Models
 
-### Diesel
+### Crude
 
-```{r}
+In order to choose the orders of the model (p and q) we implemented a cross-validation algorithm that tries 25 models (we tried p from 1 to 5 and q from 1 to 5 considering all possible combinations). We decided on models using just one MA or AR components in order to have a more parcimonious/sparse? model since that would make the results more interpretable.
+
+```{r, warnings = FALSE,include=FALSE}
 errors<-data.frame(AR=1,MA=1,ERR=1)
 k<-1
 for (i in 1:5){
   for(j in 1:5){
-    model<-arma(data5$Diesel,lag=list(ar=c(i),ma=c(j)))
+    model<-arma(data5$Crude,lag=list(ar=c(i),ma=c(j)))
     errors[k,1]<-i
     errors[k,2]<-j
     errors[k,3]<-model$css
     k<-k+1
   }
 }
+```
+
+```{r}
+ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point()+ylab("Error")
+```
+The plot above shows the empirical error of the models. Based on it's output we chose a model with AR=2 and MA=1.
+
+```{r}
+arma(data5$Crude,lag=list(ar=c(2),ma=c(1)))
+```
+
+### Miles
+
+```{r, warnings = FALSE,include=FALSE}
+errors<-data.frame(AR=1,MA=1,ERR=1)
+k<-1
+for (i in 1:5){
+  for(j in 1:5){
+    model<-arma(RA_Miles_stat,lag=list(ar=c(i),ma=c(j)))
+    errors[k,1]<-i
+    errors[k,2]<-j
+    errors[k,3]<-model$css
+    k<-k+1
+  }
+}
+```
+
+```{r}
+ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point()
+```
+
+The plot above shows the empirical error of the models. Based on it's output we chose a model with AR=1 and MA=2.
+
+```{r}
+arma(RA_Miles_stat,lag=list(ar=c(1),ma=c(2)))
 ```
