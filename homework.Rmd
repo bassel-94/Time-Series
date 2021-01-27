@@ -660,6 +660,7 @@ model<-arma(data5$Crude,lag=list(ar=c(2),ma=c(1)))
 
 ```{r}
 shapiro.test(na.omit(model$residuals))
+qqnorm(model$residuals)
 plot(density(na.omit(model$residuals)))
 ```
 
