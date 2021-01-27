@@ -200,13 +200,15 @@ During our analysis we use 5 time series, 4 related to the evolution of the pric
 
 * Consumer Price Index for All Urban Consumers: All Items in U.S. City Average: This is a measure of CPI, the downloaded data is an index with the base in the early 1980's. We needed this series because we are dealing with prices that need to be adjusted with inflation in order to allow for comparisons between distant time periods. This series was downloaded from the site of the Federal Reserve Bank of the United States.
 
+In order to solve the first question, we choose to analyze the time series Miles and Crude.
+
 ## Loading and Preparing the Data
 
 On the first step we had to load the data from the csv files it was stored on. Then we made sure that the dates are expressed in a format that was comprehensible for R.
 On this step we also re-expressed the CPI in order for it's base to be the month of April of 1994. The change of basis was done by dividing all the values in the CPI series with the value for April 1994.
 Next we "assembled the data sets" and extracted the year for plotting, we also reshaped the data in a long format, again for plotting purposes.
 
-```{r}
+```{r, include = FALSE, echo=FALSE}
 data<-read.csv("serie completa.csv",sep=",",header=TRUE)
 dates <- seq(ISOdate(1994,4,1), by = "month", length.out = 321)
 data$Date<-dates
@@ -216,15 +218,15 @@ CPI<-CPI[-321,]
 Road_travel<-read.csv("TRFVOLUSM227NFWA.csv")
 ```
 
-```{r}
+```{r, include = FALSE, echo=FALSE}
 CPI1<-data.frame(DATE=CPI[,1],CPI[,2]/CPI[1,2])
 ```
 
-```{r}
+```{r,include = FALSE, echo=FALSE}
 data<-data.frame(data,Miles_Travelled=Road_travel[,2])
 ```
 
-```{r}
+```{r,include = FALSE, echo=FALSE}
 data2<-reshape(data, 
         direction = "long",
         varying = list(names(data)[2:5]),
@@ -244,7 +246,7 @@ data2<-data.frame(data2,year=years)
 
 ### Yearly Evolution
 
-The first step of our exploratory data analysis of the time series at hand is to produce a plot showing the evolution of Crude oil prices as well as the miles traveled over time.  
+The first step of our exploratory data analysis of the time series Crude and Miles is to produce a plot showing the evolution of Crude oil prices as well as the miles traveled over time.  
 
 ```{r, warning=FALSE, echo=FALSE,fig.align="center", fig.width=8, fig.height=4, fig.cap="Yearly evolution of crude oil prices and miles traveled"}
 
@@ -269,24 +271,13 @@ p2 = ggplot(data2[data2$Type=="Miles",])+
 grid.arrange(p1,p2, ncol = 2)
 ```
 
-The plots above show the values for each year as boxplots with the blue line uniting the medians of each year. For the crude oil prices we can observe that prices increased steadily from 2003 to 2008 when they had a sudden drop due to the financial and economic crisis of that year. Recovery was fast and from 2011 to 2014 prices remained on a plateau just bellow 100$ per barrel. In 2015 prices declined again, but this time the recovery was sower and was also interrupted by the COVID-19 pandemic. From the point of view of variability three years stand out 2007, 2008 and 2009, this are years when the price grew and declined very rapidly. The number of miles traveled per month had a similar variability each year and most years also have an extreme low-value. The series has an ascending trend that was "smoothed" by the crisis of 2008 and somewhat reversed (probably temporarily) by the Covid-19 pandemic.
+The plots above show the values for each year as boxplots with the blue line uniting the medians of each year. For the crude oil prices we can observe that prices increased steadily from 2003 to 2008 when they had a sudden drop due to the financial and economic crisis of that year. The drop have been recovered from 2011 to 2014 prices and remained on a plateau just bellow 100$ per barrel. A significant drop of price is clearly observed in the end of 2019 to early 2020 which can be interrupted by the COVID-19 pandemic. From a variability point of view, three years stand out; 2007, 2008 and 2009, this are years when the price grew and declined very rapidly. The number of miles traveled per month had a similar variability each year and most years also have an extreme low-value. The series has an ascending trend that was "smoothed" by the crisis of 2008 and somewhat reversed (probably temporarily) by the COVID-19 pandemic.
 
 ### Monthly Evolution
 
 In the following plots we can observe the monthly evolution of the data sets, we had to plot them separately because of the different units of measurement. The evolution of diesel and gasoline prices was very similar and it basically followed he same movement trajectory as that of the crude oil.
 
-On the plot of the prices of crude oil  we added a blue line representing a moving average with basis 12. It has a similar trajectory to the non-smoothed series. 
-For the traveled miles data we can observe a clear seasonality with travel declining around February, in this case smoothing using moving averages has a greater impact allowing us to see the trend.
-
-```{r, warning=FALSE, echo=FALSE, fig.width=12, fig.height=4, fig.cap="Monthly evolution of crude oil prices and miles traveled"}
-
-p1 = ggplot(data2[data2$Type=="Diesel"|data2$Type=="Gasoline",])+
-  aes(x=Date,y=Value,colour=Type)+
-  geom_line()+
-  ggtitle("Evolution of Diesel and Gasoline prices")+
-  xlab("Year")+
-  ylab("Price in dolars (1994)") + theme_bw()
-
+```{r, warning=FALSE, echo=FALSE, fig.width=10, fig.height=4, fig.cap="Monthly evolution of crude oil prices and miles traveled"}
 p2 = ggplot(data2[data2$Type=="Crude",])+
   aes(x=Date,y=Value,colour=Type)+
   geom_line()+
@@ -303,25 +294,23 @@ p3 = ggplot(data2[data2$Type=="Miles",])+
   xlab("Year")+
   ylab("Miles")
 
-grid.arrange(p1,p2,p3, ncol = 3)
+grid.arrange(p3,p2, ncol = 2)
 ```
+
+On the plot of the prices of crude oil  we added a blue line representing a moving average with basis 12. It has a similar trajectory to the non-smoothed series. 
+For the traveled miles data we can observe a clear seasonality with travel declining around February. In such case, smoothing using moving averages has a greater impact allowing us to see the trend.
 
 ## Adjusting for inflation
 
-The next step of our analysis would be to adjust the series for inflation. This step is essential in order to make the prices of different time periods comparable as inflation can induce a trend where there is actually none. The adjustment was done by dividing the price time series by the index of the CPI corresponding to each month. The basis for the adjustment was the month of April of 1994.
+The next step of our analysis would be to adjust the series for inflation. This step is essential in order to make the prices of different time periods comparable as inflation can induce a trend where there is actually none. The adjustment was done by dividing the price time series by the index of the CPI corresponding to each month. The basis for the adjustment was the month of April of 1994 which would give the following plots for the monthly evolution of Miles traveled and Crude oil prices.
 
-```{r, include=FALSE, warning=FALSE, echo=FALSE}
+```{r, warning=FALSE, echo=FALSE, fig.width=8, fig.height=4, fig.cap="Monthly evolution of crude oil and Diesel & Gasoline prices after adjustment for inflation"}
 data3<-data.frame(Date=data$Date,
                  Diesel=data$U.S..No.2.Diesel.Retail.Prices..Dollars.per.Gallon./CPI1[,2],
                  Gasoline=data$U.S..All.Grades.All.Formulations.Retail.Gasoline.Prices..Dollars.per.Gallon./CPI1[,2],
                  Crude=data$Cushing..OK.WTI.Spot.Price.FOB..Dollars.per.Barrel./CPI1[,2],
                  Miles=data$Miles_Travelled)
-data3
-```
 
-The yearly evolution of adjusted for inflation crude prices was similar to the one unadjusted but the prices in the last years of the series are lower (and thus closer to the ones of the first years). Thus we can observe on this serie that cruse prices went from just bellow 25 doars in the 1990's to basically the same level today with much higher prices in between.
-
-```{r, echo=FALSE, warning=FALSE, fig.width=6, fig.height=4, fig.cap="Yearly evolution of crude oil prices after adjustmenet for inflation"}
 data4<-reshape(data3, 
         direction = "long",
         varying = list(names(data3)[2:5]),
@@ -332,63 +321,24 @@ data4<-reshape(data3,
 
 data4<-data.frame(data4,year=as.numeric(format(as.Date(data4$Date, format="%d/%m/%Y"),"%Y")))
 
-ggplot(data4[data4$Type=="Crude",])+
-  aes(x=as.factor(year),y=Value)+
-  geom_boxplot()+
-  stat_summary(fun=median, geom="smooth", aes(group=1))+
-  ggtitle("Yearly Evolution of Crude Oil Prices",subtitle = "Adjusted for inflation")+
-  xlab("Year")+
-  ylab("Price in dolars (1994)") + theme_bw() + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-Similarly, we show the evolution of monthly prices of Diesel and Gasoline prices after inflation adjustment
-
-```{r, warning=FALSE, echo=FALSE, fig.width=8, fig.height=4, fig.cap="Monthly evolution of crude oil and Diesel & Gasoline prices after adjustment for inflation"}
-
-p1 = ggplot(data4[data4$Type=="Diesel"|data4$Type=="Gasoline",])+
-  aes(x=Date,y=Value,colour=Type)+
-  geom_line()+
-  ggtitle("Evolution of Retail Prices of Diesel and Gasoline",subtitle = "Adjusted for inflation")+
-  xlab("Year")+
-  ylab("Price in dolars (1994)")
-
 p2 = ggplot(data4[data4$Type=="Crude",])+
   aes(x=Date,y=Value,colour=Type)+
   geom_line()+
   ggtitle("Crude Oil Prices",subtitle = "Adjusted for inflation")+
   xlab("Year")+
   ylab("Price in dolars (1994)")+
-  geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue")
+  geom_line(aes(y=rollmean(Value, 12, na.pad=TRUE)),colour="blue") + theme_bw() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-grid.arrange(p1,p2, ncol = 2)
+p2
 ```
 
-## Check Seasonality [maybe we can replace that with my section (see section below)]
+Indeed, the monthly evolution of adjusted crude oil prices shows similar results to the unadjusted one. However, the prices in the last years registered in the times series are lower and thus closer to the ones of the early years of the time series.
 
-One important step in time series analysis is the checking of seasonality. In order to do that we will plot the average value of the series for each month (and then for each season).
-The oil price series (bellow) has similar mean values for each month with a higher variability in summer months. But by the look of the plot there is a small chance that it would have a trend.
 ```{r}
 data4<-data.frame(data4,month=as.numeric(format(as.Date(data4$Date, format="%d/%m/%Y"),"%m")))
-p1 = ggplot(data4[data4$Type=="Crude",])+
-  aes(x=as.factor(month),y=Value)+
-  geom_boxplot()+
-  stat_summary(fun=median, geom="smooth", aes(group=1))+
-  ggtitle("Monthly oil prices",subtitle = "Adjusted for inflation")+
-  xlab("Month")+
-  ylab("Price in dolars (1994)")
-p2 = ggplot(data4[data4$Type=="Miles",])+
-  aes(x=as.factor(month),y=Value)+
-  geom_boxplot()+
-  stat_summary(fun=median, geom="smooth", aes(group=1))+
-  ggtitle("Monthly Miles Travelled")+
-  xlab("Month")+
-  ylab("Miles Travelled")
-grid.arrange(p1,p2, ncol = 2)
-```
-The number of miles traveled data  does seem to have a monthly trend based on the values of the medians with a sharp decrease in the month of February. We will also try to plot the per season data.
+RA_Miles<-rollmean(data3$Miles,12)
 
-```{r}
 for ( i in 1:nrow(data4)){
   if(data4$month[i] %in% c(12,1,2)){
   data4$season[i]<-"winter"
@@ -403,27 +353,22 @@ if (data4$month[i] %in% c(9,10,11)){
   data4$season[i]<-"autumn"
 }
 }
-
-ggplot(data4[data4$Type=="Miles",])+
-  aes(x=as.factor(season),y=Value)+
-  geom_boxplot()+
-  stat_summary(fun=median, geom="smooth", aes(group=1))+
-  ggtitle("Monthly Miles Travelled")+
-  xlab("Month")+
-  ylab("Miles Travelled")
-```
-
-```{r}
-RA_Miles<-rollmean(data3$Miles,12)
+# ggplot(data4[data4$Type=="Miles",])+
+#   aes(x=as.factor(season),y=Value)+
+#   geom_boxplot()+
+#   stat_summary(fun=median, geom="smooth", aes(group=1))+
+#   ggtitle("Monthly Miles Travelled")+
+#   xlab("Month")+
+#   ylab("Miles Travelled")
 ```
 
 ## Time Series decomposition and analysis
 
 Time series decompostion is an essential step for the exploratory data analysis. It gives rich insight on the different elements of the series when it comes to trend, seasonality and the remainder. The time decomposition method that we chose is "STL" which stands for “Seasonal and Trend decomposition using Loess,” while Loess is a method for estimating nonlinear relationships. The following plot shows the time decomposition of the univariate time series "Crude oil" to better visualize how it works.
 
-In this section, we will perform a time series decomposition of the crude oil and the miles times series to further explore them.
+In this section, we will perform a time series decomposition of the crude oil and the miles times series to further explore their trend and seasonality.
 
-```{r, warnings = FALSE, fig.align='center', fig.width=12, fig.height=10, echo = FALSE}
+```{r, warnings = FALSE, fig.align='center', fig.width=12, fig.height=6, echo = FALSE, fig.cap="Time series decomposition displaying seasonality and trend"}
 df = data3 %>%
   mutate(Date = as.POSIXct(Date)) %>% 
   remove_rownames() %>% 
@@ -436,11 +381,6 @@ d3 = df %>% time_decompose(Gasoline, method = "stl", frequency = "auto", trend =
 d4 = df %>% time_decompose(Diesel, method = "stl", frequency = "auto", trend = "auto", message = FALSE)
 
 #-- plots for only crude and miles time series and arrange in a grid
-p1 = ggplot(d1, aes(x = Date, y = observed)) + 
-  geom_line(color = "steelblue", size = 1) + theme_bw() + ggtitle("Raw data of Crude oil prices") + 
-  scale_x_datetime(date_labels = "%Y", breaks = date_breaks("1 year"), labels=date_format('%Y')) + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
 p2 = ggplot(d1, aes(x = Date, y = season)) +
   geom_line(color = "steelblue", size = 1) + theme_bw() + ggtitle("Seasonality") + 
   scale_x_datetime(date_labels = "%Y", breaks = date_breaks("1 year"), labels=date_format('%Y')) + 
@@ -452,11 +392,6 @@ p3 = ggplot(d1, aes(x = Date, y = trend)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 #-- do plots and arrange in a grid
-p4 = ggplot(d2, aes(x = Date, y = observed)) + 
-  geom_line(color = "steelblue", size = 1) + theme_bw() + ggtitle("Raw data of Miles traveled") + 
-  scale_x_datetime(date_labels = "%Y", breaks = date_breaks("1 year"), labels=date_format('%Y')) + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
 p5 = ggplot(d2, aes(x = Date, y = season)) +
   geom_line(color = "steelblue", size = 1) + theme_bw() + ggtitle("Seasonality") + 
   scale_x_datetime(date_labels = "%Y", breaks = date_breaks("1 year"), labels=date_format('%Y')) + 
@@ -467,12 +402,12 @@ p6 = ggplot(d2, aes(x = Date, y = trend)) +
   scale_x_datetime(date_labels = "%Y", breaks = date_breaks("1 year"), labels=date_format('%Y')) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-grid.arrange(p1,p4,p2,p5,p3,p6, nrow = 3, ncol = 2)
+grid.arrange(p2,p5,p3,p6, nrow = 2, ncol = 2)
 ```
 
 Upon examining the crude oil plots, we notice the unexistance of a linear trend, hence indicating non stationarity in the crude oil prices. In addition, we notice that the seasonal trend is slightly irregular throughout the year. The upper and lower bound of the seasonal component hints that it is statistically insignificant compared to the actual bounds of the crude oil prices.
 
-The Miles times series, however, shows some more structure. The seasonality is non-negligable and a linear trend is visible. We can zoom in further on the seasonality effect of this variable by showing a box plot of the mean of all years of data throughout each month.
+The Miles times series, however, shows some more structure. The seasonality is non-negligable and a linear trend is visible. We can zoom in further on the seasonality effect of this variable by showing a box plot of the mean of all years of data throughout each month to obtain the following plot.
 
 ```{r, echo=FALSE, warning=FALSE, fig.width=6, fig.height=4, fig.cap="Seasonality of Miles"}
 for ( i in 1:nrow(data4)){
@@ -511,68 +446,38 @@ ggplot(to_plot[to_plot$Type=="Miles",])+
 
 Indeed, we find that during winters, people are less likely to be traveling due to harsh weather conditions. In contrast, summers tend to be more active and we can see a clear increase of miles traveled in hotter periods.
 
-## Checking for Autocorrelation
+## ACF, PACF and the white noise assumption
 
-### Autocorrelation of the white noise process
-
-One of the most important assumptions of any time series modeling is *random noise*. Therefore, we will explore the remainder component in order to make sure it satisfies the random noise assumptions which are the following :
+One of the most important assumptions of any time series modeling is *random noise*. Therefore, we will explore the random component of the time series decomposition in order to make sure it satisfies the random noise assumptions which are the following :
 
 * Little to no autocorrelation (i.e.  $\mathbb{E} (\varepsilon_t \times \varepsilon_\tau) = 0$ $\forall t,\tau \in \mathbb{Z}$ given that $ \tau \neq t$ )
 * Normal distribution with $\mathbb{E} (\varepsilon_t) = 0$ and $\mathbb{E} (\varepsilon_t^2) = \sigma^2$
 
-To check these assumptions, we will first plot the autocorrelation of all 4 variables of interest; Gasoline, Diesel, Miles and Crude which we can see in the figure below :
+To check these assumptions, we will first plot the autocorrelation of the random components of Crude and Miles in the figure below.
 
-```{r, warnings = FALSE, fig.align='center', fig.width=7, fig.height=5, echo = FALSE, fig.cap="Autocorrelation of the white noise processes"}
-
-
-p1 = ggAcf(ts(d1$remainder)) + ggtitle("Autocorrelation of Crude") + theme_bw()
-p2 = ggAcf(ts(d2$remainder)) + ggtitle("Autocorrelation of Miles") + theme_bw()
-p3 = ggAcf(ts(d3$remainder)) + ggtitle("Autocorrelation of Gasoline") + theme_bw()
-p4 = ggAcf(ts(d4$remainder)) + ggtitle("Autocorrelation of Diesel") + theme_bw()
-
-grid.arrange(p1,p2,p3,p4)
+```{r, warnings = FALSE, fig.align='center', fig.width=6, fig.height=3, echo = FALSE, fig.cap="Autocorrelation of the white noise processes"}
+p1 = ggAcf(ts(d1$remainder)) + ggtitle("ACF of Crude's random component ") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p2 = ggAcf(ts(d2$remainder)) + ggtitle("ACF of Miles' random component") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+grid.arrange(p1,p2, ncol = 2)
 ```
 
-We can clearly discern some structure in the beginning of the autocorrelation plots of the white noise processes for each of the time series at hand. This is an indicator of non stationarity that should be handled before proceeding to do any modeling.
+We can clearly discern some structure in the beginning of the autocorrelation plots of the white noise processes for each of the time series at hand. This is an indicator of non stationarity that should be handled before proceeding to do any modeling. 
 
-### Autocorrelation of the covariates 
-
-Similarly, we will explore the autocorrelation of each of the covariates of interest as a function of the lag. Their corresponding plots below indicate a high autocorrelation with respect to their lag, further confirming the non stationarity found in all of the covariates.
-
-```{r, warnings = FALSE, fig.align='center', fig.width=6, fig.height=4, echo = FALSE, fig.cap="Autocorrelation of all the covariates"}
-#-- loop over the covariates and create autocorrelation plots
-p = list()
-for (i in 2:ncol(data3)){
-  p[[i]] = ggAcf(ts(data3[,i])) + 
-    ggtitle(paste("Autocorrelation of", names(data3)[i])) + 
-    theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5)) + 
-    theme_bw()
-}
-grid.arrange(p[[2]], p[[3]], p[[4]], p[[5]])
-acf(RA_Miles)
-```
-
-### Partial Autocorrelation
+Similarly, the ACF and PACF plots below indicate high autocorrelation with respect to their lag, further confirming our non stationarity hypothesis throughout the exploratory data analysis.
 
 Another measure that we must check is the partial autocorrelation of the series, as we can see the partial autocorelations tend not to decrease under the representativity threshold after the first lag. This big partial autocorrelation in later lags suggests that the series are not stationary.
 
-```{r, warnings = FALSE, fig.align='center', fig.width=6, fig.height=4, echo = FALSE, fig.cap="Autocorrelation of all the covariates"}
-#-- loop over the covariates and create autocorrelation plots
-p = list()
-for (i in 2:ncol(data3)){
-  p[[i]] = ggPacf(ts(data3[,i])) + 
-    ggtitle(paste("PACF of", names(data3)[i])) + 
-    theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5)) + 
-    theme_bw()
-}
-grid.arrange(p[[2]], p[[3]], p[[4]], p[[5]])
+```{r, warnings = FALSE, fig.align='center', fig.width=6, fig.height=4, echo = FALSE, fig.cap="Autocorrelation of the covariates and their random component"}
+p1 = ggPacf(ts(data3[,4])) + ggtitle("PACF of Miles") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p2 = ggPacf(ts(data3[,5])) + ggtitle("PACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p3 = ggAcf(ts(data3[,4])) + ggtitle("ACF of Miles") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p4 = ggAcf(ts(data3[,5])) + ggtitle("ACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+grid.arrange(p3,p4,p1,p2)
 ```
 
-### Augmented Dickey-Fuller Test
+Another way of checking stationary of time series is the Augmented Dickey-Fuller test which we performed on all the variables of the time series.
 
-Another way of checking stationary of time series is the Augmented Dickey-Fuller test.
-
-```{r}
+```{r, echo=FALSE, warning = FALSE, include = FALSE}
 to_table<-data.frame(Series_name=0,Lag_order=0,p_value=0)
 for (i in 2:ncol(data3)){
   to_table[i-1,1]<-colnames(data3)[i]
@@ -584,11 +489,18 @@ to_table[4,1]<-"Miles Rolling Averages"
 to_table[4,2]<-12
 test<-adf.test(data3$Miles,alternative="stationary",k=12)
 to_table[4,3]<-test$p.value
-to_table
+```
+
+```{r, echo=FALSE}
+knitr::kable(to_table, 
+  caption = 'P value of the statistic Augmented Dickey-Fuller', 
+  col.names = c("Series name", "Lag order", "p-value")
+)
 ```
 
 From the table above we see that the results of the p-value of the Augmented Dickey-Fuller test for the series are generally above 0.05 which means that our series are non-stationary. In regard to the Miles variable the test for lag one says that the series is stationary, but this effect is due to the seasonal patterns of travel in the United States. If we were to perform the test for a lag of 12 we would be able to discover the non-stationarity of the series. In order to fix the stationarity of the Miles series we replaced it with its rolling averages with a base 12. As rolling averages are computed as an average over 12 values of the series we can expect them to be non-stationary (a fact that we can also observe in the plot above).
-### Removing Stationarity
+
+## Removing Stationarity
 
 Our conclusion from the exploratory data analysis indicates that the time series we are studying is, indeed, a non-stationary process. A non-stationary process, by definition contains a trend that has a mean growing around a fixed trend, which is constant and independent of time.
 
@@ -601,30 +513,16 @@ $$
 
 After doing so, We plot the auto correlation again to make sure we removed the non-stationarity and get the following results:
 
-```{r, warnings = FALSE, fig.align='center', fig.width=6, fig.height=4, echo = FALSE, fig.cap="Autocorrelation of all the covariates"}
+```{r, warnings = FALSE, fig.align='center', fig.width=6, fig.height=3, echo = FALSE, fig.cap="Autocorrelation of the covariates after differentiating"}
 #-- differentiate to remove non-stationnarity
 data5<-data.frame(Date=1:319)
 data5$Date<-data3$Date[-1]
 data5<-data.frame(data5,apply(data3[,2:4],MARGIN = 2,FUN = diff))
 RA_Miles_stat<-diff(RA_Miles)
 
-#-- loop over the covariates and create autocorrelation plots
-p = list()
-for (i in 2:ncol(data5)){
-  p[[i]] = ggAcf(ts(data5[,i])) + 
-    ggtitle(paste("Autocorrelation of", names(data5)[i])) + 
-    theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5)) + 
-    theme_bw()
-}
-
-#-- final plot for the miles
-p[[5]] = ggAcf(ts(RA_Miles_stat)) + 
-    ggtitle(paste("Autocorrelation of Miles")) + 
-    theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5)) + 
-    theme_bw()
-
-#-- arrange in a grid
-grid.arrange(p[[2]], p[[3]], p[[4]], p[[5]])
+p3 = ggAcf(ts(data5[,3])) + ggtitle("ACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p4 = ggAcf(ts(RA_Miles_stat)) + ggtitle("ACF of Miles") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+grid.arrange(p3,p4, ncol = 2)
 ```
 
 After examining the autocorrelation plots for the second time after differentiating, we can see that we get, to certain extent, w nicer stationary time series that can now use to build our ARMA model in the next step.
@@ -649,9 +547,12 @@ for (i in 1:5){
 }
 ```
 
-```{r}
-ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point()+ylab("Error")
+```{r, echo=FALSE,fig.align='center', fig.width=5, fig.height=4, fig.cap="Cross validation error against order of AR and MA processes"}
+ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point(size = 2, alpha = 0.5)+ylab("Error") + 
+  theme_bw() + ggtitle("Cross validation error against order of the models") + 
+  xlab("AR process order")+ ylab("Cross Validation Error")
 ```
+
 The plot above shows the empirical error of the models. Based on it's output we chose a model with AR=2 and MA=1.
 
 ```{r, warnings = FALSE,include=FALSE}
@@ -664,9 +565,9 @@ qqnorm(model$residuals)
 plot(density(na.omit(model$residuals)))
 ```
 
-```{r}
-print(" The coefficients of the fitted model are: ")
-model$coef
+```{r, fig.align='center', fig.width=8, fig.height=6, echo = FALSE, warning=FALSE, fig.cap="Fitted ARMA models on the time series Crude"}
+#print(" The coefficients of the fitted model are: ")
+#model$coef
 to_plot<-data.frame(Date=data5$Date,Original_Series=data5$Crude,Fitted_Series=model$fitted.values)
 Fitted_Series<-rep(NA,nrow(data3))
 Fitted_Series[length(model$fitted.values)-length(na.omit(model$fitted.values))]<-data3$Crude[length(model$fitted.values)-length(na.omit(model$fitted.values))]
@@ -683,7 +584,8 @@ to_plot<-reshape(to_plot,
 p1=ggplot(to_plot)+aes(x=Date,y=Value,colour=Type)+
   geom_line()+
   xlab("Monthly Change")+
-  ggtitle("Crude Oil Price",subtitle = "First difference")
+  ggtitle("Crude Oil Price",subtitle = "First difference") + theme_bw()
+
 to_plot<-data.frame(Date=data3$Date,Original_Series=data3$Crude,Fitted_Series=Fitted_Series)
 to_plot<-reshape(to_plot, 
         direction = "long",
@@ -692,15 +594,16 @@ to_plot<-reshape(to_plot,
         idvar = c("Date"),
         timevar = "Type",
         times = c("Original Series","Fitted Series"))
+
 p2=ggplot(to_plot)+aes(x=Date,y=Value,colour=Type)+
   geom_line()+
   xlab("Monthly Price")+
-  ggtitle("Crude Oil Price",subtitle = "Real Vs. Fitted")
+  ggtitle("Crude Oil Price",subtitle = "Real Vs. Fitted") + theme_bw()
+
 grid.arrange(p1,p2)
 ```
 
-
-As can be observed from the plots above our model captures quite well the evolution of both the differentiated series and that of the real series. What our model fails to fully take into account is the variance of the series, it has a lower variance than the real series.
+We can observe from the plots above our model have been successful at capturing the evolution of both the differentiated series and original series. In contrast, our model fails to fully take into account is the variance of the series, it has a lower variance than the real series.
 
 ### Miles
 
@@ -718,11 +621,13 @@ for (i in 1:5){
 }
 ```
 
-```{r}
-ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point()
+```{r, echo=FALSE,fig.align='center', fig.width=5, fig.height=4, fig.cap="Cross validation error against order of AR and MA processes"}
+ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point(size = 2, alpha = 0.5)+ylab("Error") + 
+  theme_bw() + ggtitle("Cross validation error against order of the models") + 
+  xlab("AR process order")+ ylab("Cross Validation Error")
 ```
 
-The plot above shows the empirical error of the models. Based on it's output we chose a model with AR=1 and MA=2.
+The plot above shows the empirical error of the models. Based on its output we chose a model with AR=1 and MA=2.
 
 ```{r, warnings = FALSE,include=FALSE}
 model<-arma(RA_Miles_stat,lag=list(ar=c(1),ma=c(2)))
@@ -732,9 +637,9 @@ model<-arma(RA_Miles_stat,lag=list(ar=c(1),ma=c(2)))
 qqnorm(model$residuals)
 ```
 
-```{r}
-print(" The coefficients of the fitted model are: ")
-model$coef
+```{r, fig.align='center', fig.width=8, fig.height=6, echo = FALSE, warning=FALSE, fig.cap="Fitted ARMA models on the time series Miles"}
+#print(" The coefficients of the fitted model are: ")
+#model$coef
 to_plot<-data.frame(Date=1:length(RA_Miles_stat),Original_Series=RA_Miles_stat,Fitted_Series=model$fitted.values)
 Fitted_Series<-rep(NA,length(RA_Miles_stat))
 Fitted_Series[length(model$fitted.values)-length(na.omit(model$fitted.values))]<-RA_Miles[length(model$fitted.values)-length(na.omit(model$fitted.values))]
@@ -751,7 +656,7 @@ to_plot<-reshape(to_plot,
 p1=ggplot(to_plot)+aes(x=Date,y=Value,colour=Type)+
   geom_line()+
   xlab("Monthly Change")+
-  ggtitle("Miles Travelled",subtitle = "First difference")
+  ggtitle("Miles Travelled",subtitle = "First difference") + theme_bw()
 to_plot<-data.frame(Date=1:length(RA_Miles),Original_Series=RA_Miles,Fitted_Series=Fitted_Series)
 to_plot<-reshape(to_plot, 
         direction = "long",
@@ -763,8 +668,8 @@ to_plot<-reshape(to_plot,
 p2=ggplot(to_plot)+aes(x=Date,y=Value,colour=Type)+
   geom_line()+
   xlab("Monthly Miles")+
-  ggtitle("Miles Travelled",subtitle = "Real Vs. Fitted")
+  ggtitle("Miles Travelled",subtitle = "Real Vs. Fitted") + theme_bw()
 grid.arrange(p1,p2)
 ```
 
-Our model reconstructs quite well both the differentiated moving averages of the original series and the moving averages themselves. The only problem is that the predicted values are somewhat lower than the real ones. This time the model also fits quite well the variance of the series.
+Our model reconstruct both the differentiated moving averages of the original series and the moving averages themselves. The only problem is that the predicted values are somewhat lower than the real ones. This time the model also fits quite well the variance of the series.
