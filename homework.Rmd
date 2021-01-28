@@ -24,6 +24,7 @@ library(forecast)
 library(gridExtra)
 library(scales)
 library(anomalize)
+library(vars)
 ```
 \newpage
 \setcounter{tocdepth}{2}
@@ -468,10 +469,10 @@ Similarly, the ACF and PACF plots below indicate high autocorrelation with respe
 Another measure that we must check is the partial autocorrelation of the series, as we can see the partial autocorelations tend not to decrease under the representativity threshold after the first lag. This big partial autocorrelation in later lags suggests that the series are not stationary.
 
 ```{r, warnings = FALSE, fig.align='center', fig.width=6, fig.height=4, echo = FALSE, fig.cap="Autocorrelation of the covariates and their random component"}
-p1 = ggPacf(ts(data3[,4])) + ggtitle("PACF of Miles") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
-p2 = ggPacf(ts(data3[,5])) + ggtitle("PACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
-p3 = ggAcf(ts(data3[,4])) + ggtitle("ACF of Miles") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
-p4 = ggAcf(ts(data3[,5])) + ggtitle("ACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p1 = ggPacf(ts(data3[,5])) + ggtitle("PACF of Miles") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p2 = ggPacf(ts(data3[,4])) + ggtitle("PACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p3 = ggAcf(ts(data3[,5])) + ggtitle("ACF of Miles") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p4 = ggAcf(ts(data3[,4])) + ggtitle("ACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
 grid.arrange(p3,p4,p1,p2)
 ```
 
@@ -500,7 +501,7 @@ knitr::kable(to_table,
 
 From the table above we see that the results of the p-value of the Augmented Dickey-Fuller test for the series are generally above 0.05 which means that our series are non-stationary. In regard to the Miles variable the test for lag one says that the series is stationary, but this effect is due to the seasonal patterns of travel in the United States. If we were to perform the test for a lag of 12 we would be able to discover the non-stationarity of the series. In order to fix the stationarity of the Miles series we replaced it with its rolling averages with a base 12. As rolling averages are computed as an average over 12 values of the series we can expect them to be non-stationary (a fact that we can also observe in the plot above).
 
-## Removing Stationarity
+## Removing Non-Stationarity
 
 Our conclusion from the exploratory data analysis indicates that the time series we are studying is, indeed, a non-stationary process. A non-stationary process, by definition contains a trend that has a mean growing around a fixed trend, which is constant and independent of time.
 
@@ -517,10 +518,11 @@ After doing so, We plot the auto correlation again to make sure we removed the n
 #-- differentiate to remove non-stationnarity
 data5<-data.frame(Date=1:319)
 data5$Date<-data3$Date[-1]
-data5<-data.frame(data5,apply(data3[,2:4],MARGIN = 2,FUN = diff))
+data3$RA_Miles<-rollmean(data3$Miles,12,fill=NA)
+data5<-data.frame(data5,apply(data3[,2:6],MARGIN = 2,FUN = diff))
 RA_Miles_stat<-diff(RA_Miles)
 
-p3 = ggAcf(ts(data5[,3])) + ggtitle("ACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
+p3 = ggAcf(ts(data5$Crude)) + ggtitle("ACF of Crude") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
 p4 = ggAcf(ts(RA_Miles_stat)) + ggtitle("ACF of Miles") + theme_bw() + theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5))
 grid.arrange(p3,p4, ncol = 2)
 ```
@@ -673,3 +675,100 @@ grid.arrange(p1,p2)
 ```
 
 Our model reconstruct both the differentiated moving averages of the original series and the moving averages themselves. The only problem is that the predicted values are somewhat lower than the real ones. This time the model also fits quite well the variance of the series.
+
+## Fitting a VAR model
+
+```{r}
+data_VAR<-na.omit(data5)
+data_VAR<-data_VAR[,-c(1,2,5)]
+VARselect(data_VAR, lag.max=9, type="const")
+model<-VAR(data_VAR,p=1)
+model
+```
+```{r}
+to_plot<-data.frame(na.omit(data5)[,-c(2,5)])
+
+for(i in 1:3){
+  to_add<-c(NA,model$varresult[[i]]$fitted.values)
+  to_plot<-data.frame(to_plot,to_add)
+}
+colnames(to_plot)[5:7]<-paste(names(model$varresult),"fitted")
+to_plot<-reshape(to_plot, 
+        direction = "long",
+        varying = list(names(to_plot)[2:7]),
+        v.names = "Value",
+        idvar = c("Date"),
+        timevar = "Type",
+        times = colnames(to_plot)[2:7])
+to_plot$Variable<-substr(to_plot$Type,1,2)
+p1<-ggplot(to_plot[to_plot$Variable=="Ga",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Gasoline prices VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+p2<-ggplot(to_plot[to_plot$Variable=="Cr",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Crude prices VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+p3<-ggplot(to_plot[to_plot$Variable=="RA",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Miles VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+grid.arrange(p1,p2,p3,nrow=3)
+```
+
+```{r}
+
+to_plot<-data.frame(na.omit(data5)[,-c(2,5)])
+
+for(i in 1:3){
+  to_add<-c(NA,model$varresult[[i]]$fitted.values)
+  to_plot<-data.frame(to_plot,to_add)
+}
+colnames(to_plot)[5:7]<-paste(names(model$varresult),"fitted")
+to_plot[,2:4]<-data3[7:314,c(3,4,6)]
+to_plot[1,5:7]<-data3[7,c(3,4,6)]
+for(i in 2:nrow(to_plot)){
+  to_plot$`Gasoline fitted`[i]<-to_plot$`Gasoline fitted`[i]+to_plot$`Gasoline fitted`[i-1]
+  to_plot$`Crude fitted`[i]<-to_plot$`Crude fitted`[i]+to_plot$`Crude fitted`[i-1]
+  to_plot$`RA_Miles fitted`[i]<-to_plot$`RA_Miles fitted`[i]+to_plot$`RA_Miles fitted`[i-1]
+}
+to_plot<-reshape(to_plot, 
+        direction = "long",
+        varying = list(names(to_plot)[2:7]),
+        v.names = "Value",
+        idvar = c("Date"),
+        timevar = "Type",
+        times = colnames(to_plot)[2:7])
+to_plot$Variable<-substr(to_plot$Type,1,2)
+p1<-ggplot(to_plot[to_plot$Variable=="Ga",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Gasoline prices VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+p2<-ggplot(to_plot[to_plot$Variable=="Cr",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Crude prices VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+p3<-ggplot(to_plot[to_plot$Variable=="RA",])+
+  aes(x=Date,y=Value,colour=Type)+
+  geom_line()+
+  ggtitle("Miles VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+grid.arrange(p1,p2,p3,nrow=3)
+```
