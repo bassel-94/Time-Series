@@ -31,6 +31,7 @@ library(vars)
 \pagenumbering{arabic}
 \tableofcontents
 \newpage
+
 # Exercise 1
 
 The purpose of this exercise is to simulate a path of length $T = 100$ from the VAR(1) model : 
@@ -492,7 +493,7 @@ test<-adf.test(data3$Miles,alternative="stationary",k=12)
 to_table[4,3]<-test$p.value
 ```
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, warning=FALSE}
 knitr::kable(to_table, 
   caption = 'P value of the statistic Augmented Dickey-Fuller', 
   col.names = c("Series name", "Lag order", "p-value")
@@ -527,7 +528,7 @@ p4 = ggAcf(ts(RA_Miles_stat)) + ggtitle("ACF of Miles") + theme_bw() + theme(plo
 grid.arrange(p3,p4, ncol = 2)
 ```
 
-After examining the autocorrelation plots for the second time after differentiating, we can see that we get, to certain extent, w nicer stationary time series that can now use to build our ARMA model in the next step.
+After examining the autocorrelation plots for the second time after differentiating, we can see that we get, to certain extent, a nicer stationary time series that can now use to build our ARMA model in the next step.
 
 ## Fitting ARMA Models
 
@@ -549,7 +550,7 @@ for (i in 1:5){
 }
 ```
 
-```{r, echo=FALSE,fig.align='center', fig.width=5, fig.height=4, fig.cap="Cross validation error against order of AR and MA processes"}
+```{r, echo=FALSE,fig.align='center', fig.width=5, fig.height=4, fig.cap="Cross validation error against the order of AR and MA processes for Crude oil prices time series"}
 ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point(size = 2, alpha = 0.5)+ylab("Error") + 
   theme_bw() + ggtitle("Cross validation error against order of the models") + 
   xlab("AR process order")+ ylab("Cross Validation Error")
@@ -623,13 +624,14 @@ for (i in 1:5){
 }
 ```
 
-```{r, echo=FALSE,fig.align='center', fig.width=5, fig.height=4, fig.cap="Cross validation error against order of AR and MA processes"}
+```{r, echo=FALSE,fig.align='center', fig.width=5, fig.height=4, fig.cap="Cross validation error against the order of AR and MA processes for the miles time series"}
 ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point(size = 2, alpha = 0.5)+ylab("Error") + 
   theme_bw() + ggtitle("Cross validation error against order of the models") + 
   xlab("AR process order")+ ylab("Cross Validation Error")
 ```
 
 The plot above shows the empirical error of the models. Based on its output we chose a model with AR=1 and MA=2.
+For such parameters, we get the following results :
 
 ```{r, warnings = FALSE,include=FALSE}
 model<-arma(RA_Miles_stat,lag=list(ar=c(1),ma=c(2)))
@@ -678,21 +680,28 @@ Our model reconstruct both the differentiated moving averages of the original se
 
 ## Fitting a VAR model
 
-```{r}
+So far we have considered each time series as univariate. We will now fit a VAR model on a vector that contains three time series; Miles, Crude oil prices and Gasoline prices.
+The plot below shows side by side the fitted VAR model against the differentiated (i.e. statonnary) time series and the fitted VAR model against the original time series.
+
+```{r, include = FALSE, warning=FALSE}
 data_VAR<-na.omit(data5)
 data_VAR<-data_VAR[,-c(1,2,5)]
 VARselect(data_VAR, lag.max=9, type="const")
 model<-VAR(data_VAR,p=1)
-model
+#model
 ```
-```{r}
+
+```{r, fig.align='center', fig.width=12, fig.height=7, echo = FALSE, warning=FALSE, fig.cap="Fitted VAR model on a vector of three time series (On the left, the differentiated time series and on the right the original time series"}
+#-- plots for the fitted against the differentiated series
 to_plot<-data.frame(na.omit(data5)[,-c(2,5)])
 
 for(i in 1:3){
   to_add<-c(NA,model$varresult[[i]]$fitted.values)
   to_plot<-data.frame(to_plot,to_add)
 }
+
 colnames(to_plot)[5:7]<-paste(names(model$varresult),"fitted")
+
 to_plot<-reshape(to_plot, 
         direction = "long",
         varying = list(names(to_plot)[2:7]),
@@ -700,47 +709,52 @@ to_plot<-reshape(to_plot,
         idvar = c("Date"),
         timevar = "Type",
         times = colnames(to_plot)[2:7])
+
 to_plot$Variable<-substr(to_plot$Type,1,2)
+
 p1<-ggplot(to_plot[to_plot$Variable=="Ga",])+
   aes(x=Date,y=Value,colour=Type)+
   geom_line()+
   ggtitle("Gasoline prices VAR prediction",subtitle = "Fitted vs Differentiated Series")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+        axis.ticks.x=element_blank()) + theme_bw()
+
 p2<-ggplot(to_plot[to_plot$Variable=="Cr",])+
   aes(x=Date,y=Value,colour=Type)+
   geom_line()+
   ggtitle("Crude prices VAR prediction",subtitle = "Fitted vs Differentiated Series")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+        axis.ticks.x=element_blank()) + theme_bw()
+
 p3<-ggplot(to_plot[to_plot$Variable=="RA",])+
   aes(x=Date,y=Value,colour=Type)+
   geom_line()+
   ggtitle("Miles VAR prediction",subtitle = "Fitted vs Differentiated Series")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-grid.arrange(p1,p2,p3,nrow=3)
-```
+        axis.ticks.x=element_blank()) + theme_bw()
 
-```{r}
-
+#-- plots for the fitted against the original series 
 to_plot<-data.frame(na.omit(data5)[,-c(2,5)])
 
 for(i in 1:3){
   to_add<-c(NA,model$varresult[[i]]$fitted.values)
   to_plot<-data.frame(to_plot,to_add)
 }
+
 colnames(to_plot)[5:7]<-paste(names(model$varresult),"fitted")
+
 to_plot[,2:4]<-data3[7:314,c(3,4,6)]
 to_plot[1,5:7]<-data3[7,c(3,4,6)]
+
 for(i in 2:nrow(to_plot)){
   to_plot$`Gasoline fitted`[i]<-to_plot$`Gasoline fitted`[i]+to_plot$`Gasoline fitted`[i-1]
   to_plot$`Crude fitted`[i]<-to_plot$`Crude fitted`[i]+to_plot$`Crude fitted`[i-1]
   to_plot$`RA_Miles fitted`[i]<-to_plot$`RA_Miles fitted`[i]+to_plot$`RA_Miles fitted`[i-1]
 }
+
 to_plot<-reshape(to_plot, 
         direction = "long",
         varying = list(names(to_plot)[2:7]),
@@ -749,26 +763,60 @@ to_plot<-reshape(to_plot,
         timevar = "Type",
         times = colnames(to_plot)[2:7])
 to_plot$Variable<-substr(to_plot$Type,1,2)
-p1<-ggplot(to_plot[to_plot$Variable=="Ga",])+
+
+p4<-ggplot(to_plot[to_plot$Variable=="Ga",])+
   aes(x=Date,y=Value,colour=Type)+
   geom_line()+
-  ggtitle("Gasoline prices VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  ggtitle("Gasoline prices VAR prediction",subtitle = "Fitted vs original Series")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-p2<-ggplot(to_plot[to_plot$Variable=="Cr",])+
+        axis.ticks.x=element_blank()) + theme_bw()
+
+p5<-ggplot(to_plot[to_plot$Variable=="Cr",])+
   aes(x=Date,y=Value,colour=Type)+
   geom_line()+
-  ggtitle("Crude prices VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  ggtitle("Crude prices VAR prediction",subtitle = "Fitted vs original Series")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-p3<-ggplot(to_plot[to_plot$Variable=="RA",])+
+        axis.ticks.x=element_blank()) + theme_bw()
+
+p6<-ggplot(to_plot[to_plot$Variable=="RA",])+
   aes(x=Date,y=Value,colour=Type)+
   geom_line()+
-  ggtitle("Miles VAR prediction",subtitle = "Fitted vs Differentiated Series")+
+  ggtitle("Miles VAR prediction",subtitle = "Fitted vs original Series")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-grid.arrange(p1,p2,p3,nrow=3)
+        axis.ticks.x=element_blank()) + theme_bw()
+
+grid.arrange(p1,p4,p2,p5,p3,p6, nrow=3)
 ```
+
+As expected, we notice a much better visual fit on the right hand side plots due to the fact that we differentiated the time series. By removing the non-stationarity, we are able to capture the structure of the time series. In addition, when we reconstruct the original time series by recovering the differentiation effect after fitting the model on the stationary vector series, we notice that we are able to maintain a similar level of goodness of fit.
+
+In contrast, one should always keep in mind that sometimes the time series at hand might have outliers that may skew the whole analysis. In the case of our vector, there has been some historical events like the 2008 economic crisis in America and the worldwide pandemic in 2020 that induced some anomalies in the series. Deleting such anomalies and repeating the analysis on a cleaner dataset is beyond the scope of this project and, therefore, will remain unexplored.
+
+## Fitting a VAR model with LASSO
+
+Penalized VAR models account for interdependencies and heterogeneities by jointly modeling multiple variables. This is done through a penalization parameter $\lambda$ which reffers to the LASSO model. In this section, we will model the three time series above (i.e. Crude oil prices, Miles traveled and Gasoline prices) using penalized autoregressive models. 
+
+To do so, we will use the nets package which includes a *nets* function that estimates sparse Vector Autoregression models by LASSO.
+
+```{r}
+if(!require(nets)) install.packages("nets")
+df = data3 %>% 
+  as_tibble() %>%
+  dplyr::select(Crude, Miles, Gasoline) %>% 
+  slice(6:n()) %>% as.matrix()
+df[1:10,]
+#-- fit Penalized VAR
+lamb = 1e-2
+model.p.test = nets(df, p = 8, lambda = lamb, weights = "adaptive")
+```
+
+```{r}
+mat_pred = predict(model.p.test, newdata = df)$y.hat
+model.p.test$y[1:10,]
+test = model.p.test$A.hat
+```
+
+Im not sure what to do here...
