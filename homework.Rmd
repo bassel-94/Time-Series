@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #-- clean environment and load libraries
 rm(list=ls())
 if(!require(MTS)) install.packages("MTS")
+if(!require(nets)) install.packages("nets")
 library(ggplot2)
 library(tidyverse)
 library(zoo)
@@ -25,6 +26,7 @@ library(gridExtra)
 library(scales)
 library(anomalize)
 library(vars)
+library(nets)
 ```
 \newpage
 \setcounter{tocdepth}{2}
@@ -791,9 +793,9 @@ p6<-ggplot(to_plot[to_plot$Variable=="RA",])+
 grid.arrange(p1,p4,p2,p5,p3,p6, nrow=3)
 ```
 
-As expected, we notice a much better visual fit on the right hand side plots due to the fact that we differentiated the time series. By removing the non-stationarity, we are able to capture the structure of the time series. In addition, when we reconstruct the original time series by recovering the differentiation effect after fitting the model on the stationary vector series, we notice that we are able to maintain a similar level of goodness of fit.
+In the table above we have on one column (the first one) the fitted values versus the real values on the first difference of the time series (see the part about stationarity above). As we can see our model fares well in fitting these values. The model has a similar problem as the univariate ones because it doesn't fit very well the periods with high volatility (as can be observe at the middle of the Crude prices plot). On the second column we may observe the original (non-stationary) series versus our fitted values, as can be seen our model fares best in predicting gasoline prices even taking into account the large variations in 2008. 
 
-In contrast, one should always keep in mind that sometimes the time series at hand might have outliers that may skew the whole analysis. In the case of our vector, there has been some historical events like the 2008 economic crisis in America and the worldwide pandemic in 2020 that induced some anomalies in the series. Deleting such anomalies and repeating the analysis on a cleaner dataset is beyond the scope of this project and, therefore, will remain unexplored.
+In contrast, one should always keep in mind that sometimes the time series at hand might have outliers that may skew the whole analysis. In the case of our vector, there has been some historical events like the 2008 global economic crisis that created a downward pressure on oil and gasoline prices and the worldwide pandemic in 2020 that induced some anomalies in the series. Nevertheless we may observe that our model fits the general direction of the anomalies without fully accounting for their amplitude.
 
 ## Fitting a VAR model with LASSO
 
@@ -802,8 +804,8 @@ Penalized VAR models account for interdependencies and heterogeneities by jointl
 To do so, we will use the nets package which includes a *nets* function that estimates sparse Vector Autoregression models by LASSO.
 
 ```{r}
-if(!require(nets)) install.packages("nets")
-df = data3 %>% 
+
+df = data5 %>% 
   as_tibble() %>%
   dplyr::select(Crude, Miles, Gasoline) %>% 
   slice(6:n()) %>% as.matrix()
