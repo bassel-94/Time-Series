@@ -810,13 +810,11 @@ df = data3 %>%
 df[1:10,]
 #-- fit Penalized VAR
 lamb = 1e-2
-model.p.test = nets(df, p = 8, lambda = lamb, weights = "adaptive")
+model = nets(df, p = 8, lambda = lamb, weights = "adaptive")
 ```
 
 ```{r}
-mat_pred = predict(model.p.test, newdata = df)$y.hat
-model.p.test$y[1:10,]
-test = model.p.test$A.hat
+model$A.hat
 ```
 
 Im not sure what to do here...
