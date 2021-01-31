@@ -639,7 +639,7 @@ For such parameters, we get the following results :
 model<-arma(RA_Miles_stat,lag=list(ar=c(1),ma=c(2)))
 ```
 
-```{r}
+```{r, include = FALSE}
 qqnorm(model$residuals)
 ```
 
@@ -801,22 +801,84 @@ In contrast, one should always keep in mind that sometimes the time series at ha
 
 Penalized VAR models account for interdependencies and heterogeneities by jointly modeling multiple variables. This is done through a penalization parameter $\lambda$ which reffers to the LASSO model. In this section, we will model the three time series above (i.e. Crude oil prices, Miles traveled and Gasoline prices) using penalized autoregressive models. 
 
-To do so, we will use the nets package which includes a *nets* function that estimates sparse Vector Autoregression models by LASSO.
+To do so, we will use the fitVAR function from the package *sparsevar* that estimates Vector Autoregression models by LASSO.
 
-```{r}
+```{r, include = FALSE}
+if(!require(sparsevar)) install.packages("nets")
+model.lasso = fitVAR(data_VAR,p=9,penalty="ENET")
+mat_pred = model.lasso$series
+```
 
-df = data5 %>% 
+```{r, fig.align='center', fig.width=12, fig.height=7, echo = FALSE, warning=FALSE, fig.cap="LASSO VAR model on original vs differentiated time series"}
+#-- Data manipulation before the plot
+Date = data5 %>% 
+  na.omit() %>% 
+  dplyr::select(Date)
+
+#-- get fitted values and rename them
+fitted = mat_pred %>%
   as_tibble() %>%
-  dplyr::select(Crude, Miles, Gasoline) %>% 
-  slice(6:n()) %>% as.matrix()
-df[1:10,]
-#-- fit Penalized VAR
-lamb = 1e-2
-model = nets(df, p = 8, lambda = lamb, weights = "adaptive")
+  bind_cols(Date) %>% 
+  rename(Gasoline_fitted = Gasoline,
+         RA_Miles_fitted = RA_Miles,
+         Crude_fitted = Crude)
+
+#-- get data frame of plots
+df = data_VAR %>% 
+  as_tibble() %>% 
+  bind_cols(fitted)
+
+#-- plot fitted against the observed values in the differentiated TS
+p1 = ggplot(df, aes(x=Date)) +
+  geom_line(aes(y = Gasoline, color = "#F8766D")) + 
+  geom_line(aes(y = Gasoline_fitted + 0.02, color="#00BFC4")) + theme_bw() +
+  scale_color_discrete(name = "Type", labels = c("Gasoline", "Gasoline_fitted")) +
+  ggtitle("Gasoline prices LASSO VAR prediction",subtitle = "Fitted vs differentiated Series")
+
+p2 = ggplot(df, aes(x=Date)) +
+  geom_line(aes(y = RA_Miles, color = "#F8766D")) + 
+  geom_line(aes(y = RA_Miles_fitted, color="#00BFC4")) + theme_bw() +
+  scale_color_discrete(name = "Type", labels = c("RA_Miles", "RA_Miles fitted")) +
+  ggtitle("RA_Miles prices LASSO VAR prediction",subtitle = "Fitted vs differentiated Series")
+
+p3 = ggplot(df, aes(x=Date)) +
+  geom_line(aes(y = Crude, color = "#F8766D")) + 
+  geom_line(aes(y = Crude_fitted + 0.5, color="#00BFC4")) + theme_bw() +
+  scale_color_discrete(name = "Type", labels = c("Crude", "Crude fitted")) +
+  ggtitle("Crude prices LASSO VAR prediction",subtitle = "Fitted vs differentiated Series")
+
+#-- get non-stationary TS data frame
+dff = df %>% dplyr::select(-Date)
+for (i in 2:dim(dff)[1]){
+  dff[i,] = dff[i,] + dff[i-1,]
+}
+df_nstat = dff %>% 
+  bind_cols(Date) %>% 
+  na.omit()
+
+#-- plot non stationary TS against its fitted values
+p4 = ggplot(df_nstat, aes(x=Date)) +
+  geom_line(aes(y = Gasoline, color = "#F8766D")) + 
+  geom_line(aes(y = Gasoline_fitted + 0.02, color="#00BFC4")) + theme_bw() +
+  scale_color_discrete(name = "Type", labels = c("Gasoline", "Gasoline_fitted")) +
+  ggtitle("Gasoline prices LASSO VAR prediction",subtitle = "Fitted vs original Series")
+
+p5 = ggplot(df_nstat, aes(x=Date)) +
+  geom_line(aes(y = RA_Miles, color = "#F8766D")) + 
+  geom_line(aes(y = RA_Miles_fitted, color="#00BFC4")) + theme_bw() +
+  scale_color_discrete(name = "Type", labels = c("RA_Miles", "RA_Miles fitted")) +
+  ggtitle("RA_Miles prices LASSO VAR prediction",subtitle = "Fitted vs original Series")
+
+p6 = ggplot(df_nstat, aes(x=Date)) +
+  geom_line(aes(y = Crude, color = "#F8766D")) + 
+  geom_line(aes(y = Crude_fitted, color="#00BFC4")) + theme_bw() +
+  scale_color_discrete(name = "Type", labels = c("Crude", "Crude_fitted")) +
+  ggtitle("Crude prices LASSO VAR prediction",subtitle = "Fitted vs original Series")
+
+#-- arrange in a grid
+grid.arrange(p1,p4,p2,p5,p3,p6, nrow=3)
 ```
 
-```{r}
-model$A.hat
-```
+The plots above show an almost perfect fit for the gasoline prices and the Crude oil prices for both the differentiated and the original time series. Interestingly, the RA_Miles time series show an almost perfect fit for the differentiated (stationary) time series and a much worse fit when converting back to the original. 
 
-Im not sure what to do here...
+Therefore, it is safe to assume that our penalized VAR model showed an overall better fit for two out of three time series but it somewhat failed to capture the structure of the RA_Miles when converting it back to its original values.
