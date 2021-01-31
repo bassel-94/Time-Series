@@ -1,5 +1,5 @@
 ---
-title: "Homework"
+title: "High Dimensional Time Series assignmnet"
 author: "Bassel MASRI & Andrei CHIRITA"
 date: "1/21/2021"
 output: pdf_document
