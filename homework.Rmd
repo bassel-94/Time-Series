@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 rm(list=ls())
 if(!require(MTS)) install.packages("MTS")
 if(!require(nets)) install.packages("nets")
+if(!require(sparsevar)) install.packages("sparsevar")
 library(ggplot2)
 library(tidyverse)
 library(zoo)
@@ -27,6 +28,8 @@ library(scales)
 library(anomalize)
 library(vars)
 library(nets)
+library(sparsevar)
+library(corrplot)
 ```
 \newpage
 \setcounter{tocdepth}{2}
@@ -197,7 +200,7 @@ During our analysis we use 5 time series, 4 related to the evolution of the pric
 
 * U.S. All Grades All Formulations Retail Gasoline Prices (referred bellow as gasoline prices): It is a general value of gasoline prices in the United States, the series is downloaded from the U.S. Energy Information Administration (EIA). The values of this series are expressed in Dollars per Gallon.
 
-* U.S. No 2 Diesel Retail Prices (referred bellow as diesel prices): It is a general value of diesel prices in the United States, the series is downloaded from EIA. The values of the series are expressed in Dollars per Gallon.
+* U.S. No 2 Diesel Retail Prices (referred bellow as diesel prices): It is a general value of diesel prices in the United States, the series is downloaded from EIA. The values of the series are expressed in Dollars per Gallon. We did not use this series in the analysis, we included it for the sake of completion of the data.
 
 * Cushing, OK WTI Spot Price FOB (referred bellow as crude oil price): It is a general value of the price of crude oil in the United States, the series is downloaded from EIA and its values are expressed in Dollars per Barrel.
 
@@ -628,6 +631,8 @@ After examining the autocorrelation plots for the second time after differentiat
 
 ## Fitting ARMA Models
 
+As we are working on differentiated series we will actually fit ARIMA models by using the ARMA R function of the series of the first difference of the original variables.
+
 ### Crude
 
 In order to choose the orders of the model (p and q) we implemented a cross-validation algorithm that tries 25 models (we tried p from 1 to 5 and q from 1 to 5 considering all possible combinations). We decided on models using just one MA or AR components in order to have a more parcimonious/sparse? model since that would make the results more interpretable.
@@ -719,6 +724,14 @@ grid.arrange(p1,p2)
 
 We can observe from the plots in figure \ref{fig:pp} that our model have been successful at capturing the evolution of both the differentiated series and original series. In contrast, our model fails to fully take into account is the variance of the series, it has a lower variance than the real series.
 
+We can further understand the quality of the model by analising the distribution of the errors.
+
+```{r pp, fig.align='center', fig.width=7, fig.height=5, echo = FALSE, warning=FALSE, fig.cap="Normal QQ plot of the errors"}
+qqnorm(model$residuals)
+```
+
+The plot above shows that the distribution of the errors is affected by the existence of some outliers in the residual series. These are due to the differences at the peak shown in the previous plot.
+
 ### Miles
 
 ```{r, warnings = FALSE,include=FALSE}
@@ -806,18 +819,32 @@ grid.arrange(p1,p2)
 
 Our model reconstruct both the differentiated moving averages of the original series and the moving averages themselves. The only problem is that the predicted values are somewhat lower than the real ones. This time the model also fits quite well the variance of the series.
 
+We can further understand the quality of the model by analyzing the distribution of the errors.
+
+```{r pp, fig.align='center', fig.width=7, fig.height=5, echo = FALSE, warning=FALSE, fig.cap="Normal QQ plot of the errors"}
+qqnorm(model$residuals)
+```
+
+As was the case with the previous model the plot above shows that the distribution of the errors is affected by the existence of some outliers in the residual series. These are due to the differences at the peak shown in the previous plot.
+
 ## Fitting a VAR model
 
-So far we have considered each time series as univariate. We will now fit a VAR model on a vector that contains three time series; Miles, Crude oil prices and Gasoline prices.
-The plot below shows side by side the fitted VAR model against the differentiated (i.e. statonnary) time series and the fitted VAR model against the original time series.
+So far we have considered each time series as univariate. We will now fit a VAR model on a vector that contains three time series; Miles, Crude oil prices and Gasoline prices. 
 
-```{r, include = FALSE, warning=FALSE}
+```{r, echo = FALSE, warning=FALSE}
 data_VAR<-na.omit(data5)
 data_VAR<-data_VAR[,-c(1,2,5)]
+```
+
+The output bellow shows the selected lag for various informational criteria. We chose to use 1 in our model because it is selected by one of the criterion and it is easier to interpret.
+
+```{r, echo = FALSE, warning=FALSE}
 VARselect(data_VAR, lag.max=9, type="const")
 model<-VAR(data_VAR,p=1)
 #model
 ```
+
+The plot below shows side by side the fitted VAR model against the differentiated (i.e. stationary) time series and the fitted VAR model against the original time series.
 
 ```{r hy, fig.align='center', fig.width=12, fig.height=7, echo = FALSE, warning=FALSE, fig.cap="Fitted VAR model on a vector of three time series (On the left, the differentiated time series and on the right the original time series"}
 #-- plots for the fitted against the differentiated series
@@ -923,6 +950,28 @@ In figure \ref{fig:hy} we have on one column (the first one) the fitted values v
 
 In contrast, one should always keep in mind that sometimes the time series at hand might have outliers that may skew the whole analysis. In the case of our vector, there has been some historical events like the 2008 global economic crisis that created a downward pressure on oil and gasoline prices and the worldwide pandemic in 2020 that induced some anomalies in the series. Nevertheless we may observe that our model fits the general direction of the anomalies without fully accounting for their amplitude.
 
+### Checking the errors of the VAR model
+
+As with the ARMA/ARIMA models we used it is important to check the distribution of the errors.
+
+```{r hy, fig.align='center', fig.width=12, fig.height=7, echo = FALSE, warning=FALSE, fig.cap="QQ norm plots and Shapiro test results"}
+par(mfrow=c(1,3))
+qqnorm(model$varresult$Gasoline$residuals,main="Gasoline")
+qqnorm(model$varresult$Crude$residuals,main="Crude")
+qqnorm(model$varresult$RA_Miles$residuals,main="Miles")
+to_shapiro<-data.frame(Series=0,Pi_Value=0,Conclusion=0)
+s_gas<-shapiro.test(model$varresult$Gasoline$residuals)
+s_cru<-shapiro.test(model$varresult$Crude$residuals)
+s_mil<-shapiro.test(model$varresult$RA_Miles$residuals)
+to_shapiro[1,]<-c("Gasoline",s_gas$p.value,0)
+to_shapiro[2,]<-c("Crude",s_cru$p.value,0)
+to_shapiro[3,]<-c("Miles",s_mil$p.value,0)
+to_shapiro[as.numeric(to_shapiro[,2])<0.05,3]<-"Not normally distributed"
+to_shapiro
+```
+
+As we can see the errors are not normally distributed, the plots suggest that this is again due to the outliers in the data. This shows a difficulty in predicting prices of real-world commodities as geopolitical, economic and even public health shocks can upend well established common sense expectations.
+
 ## Fitting a VAR model with LASSO
 
 Penalized VAR models account for interdependencies and heterogeneities by jointly modeling multiple variables. This is done through a penalization parameter $\lambda$ which reffers to the LASSO model. In this section, we will model the three time series above (i.e. Crude oil prices, Miles traveled and Gasoline prices) using penalized autoregressive models. 
@@ -930,7 +979,6 @@ Penalized VAR models account for interdependencies and heterogeneities by jointl
 To do so, we will use the fitVAR function from the package *sparsevar* that estimates Vector Autoregression models by LASSO.
 
 ```{r, include = FALSE}
-if(!require(sparsevar)) install.packages("nets")
 model.lasso = fitVAR(data_VAR,p=9,penalty="ENET")
 mat_pred = model.lasso$series
 ```
@@ -1008,3 +1056,29 @@ grid.arrange(p1,p4,p2,p5,p3,p6, nrow=3)
 The plots in figure \ref{fig:lass} show an almost perfect fit for the gasoline prices and the Crude oil prices for both the differentiated and the original time series. Interestingly, the RA_Miles time series show an almost perfect fit for the differentiated (stationary) time series and a much worse fit when converting back to the original. 
 
 Therefore, it is safe to assume that our penalized VAR model showed an overall better fit for two out of three time series but it somewhat failed to capture the structure of the RA_Miles when converting it back to its original values.
+
+```{r hy, fig.align='center', fig.width=12, fig.height=7, echo = FALSE, warning=FALSE, fig.cap="QQ norm plots and Shapiro test results"}
+to_shapiro<-data.frame(Series=0,Pi_Value=0,Conclusion=0)
+for(i in 1:3){
+  to_shapiro[i,1]<-colnames(model.lasso$residuals)[i]
+  to_shapiro[i,2]<-shapiro.test(model.lasso$residuals[,i])$p.value
+  if(as.numeric(to_shapiro[i,2])<0.05){
+    to_shapiro[,3]<-"Not normally distributed"
+  }
+  else
+    to_shapiro[,3]<-"Normally distributed"
+}
+par(mfrow=c(1,3))
+for(i in 1:3){
+  qqnorm(model.lasso$residuals[,i],main=colnames(model.lasso$residuals)[i])
+}
+to_shapiro
+```
+
+We can again observe that the outliers in the data affect the quality of the model by creating outliers in the errors too.
+
+## Conclusion
+
+In our project we tried to create a model that would predict and help in understanding the evolution of gasoline prices in the United States of America in the last 26 years. In order to do that we used both univariate and multivariate models. We began by checking for stationarity and seasonality in the data. After we smoothed and differentiated the data we fitted univariate models on two of those series, namely on Crude Oil Prices and Miles travelled per month. 
+
+The fitted univariate models were quite effective in modeling the original series. They had some problems due to the existence of some outlier values (created by the economic crises of 2008 and 2020). A similar pattern was observed in the VAR models fitted (both with and without LASSO).
