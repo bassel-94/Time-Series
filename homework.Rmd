@@ -724,9 +724,9 @@ grid.arrange(p1,p2)
 
 We can observe from the plots in figure \ref{fig:pp} that our model have been successful at capturing the evolution of both the differentiated series and original series. In contrast, our model fails to fully take into account is the variance of the series, it has a lower variance than the real series.
 
-We can further understand the quality of the model by analising the distribution of the errors.
+We can further understand the quality of the model by analising the distribution of the errors which we can see in figure \ref{fig:er1}.
 
-```{r pp, fig.align='center', fig.width=7, fig.height=5, echo = FALSE, warning=FALSE, fig.cap="Normal QQ plot of the errors"}
+```{r er1, fig.align='center', fig.width=5, fig.height=3.5, echo = FALSE, warning=FALSE, fig.cap="Normal QQ plot of the errors of Crude oil prices"}
 qqnorm(model$residuals)
 ```
 
@@ -760,7 +760,10 @@ ggplot(errors)+aes(x=AR,y=ERR,colour=as.factor(MA))+geom_point(size = 2, alpha =
 ```
 
 The plot above shows the empirical error of the models. Based on its output we chose a model with AR=1 and MA=2.
-For such parameters, we get the following results :
+For such parameters, we get the following results :knitr::kable(to_table, 
+  caption = 'P value of the statistic Augmented Dickey-Fuller', 
+  col.names = c("Series name", "Lag order", "p-value")
+)
 
 ```{r, warnings = FALSE,include=FALSE}
 model<-arma(RA_Miles_stat,lag=list(ar=c(1),ma=c(2)))
@@ -821,7 +824,7 @@ Our model reconstruct both the differentiated moving averages of the original se
 
 We can further understand the quality of the model by analyzing the distribution of the errors.
 
-```{r pp, fig.align='center', fig.width=7, fig.height=5, echo = FALSE, warning=FALSE, fig.cap="Normal QQ plot of the errors"}
+```{r, fig.align='center', fig.width=5, fig.height=3.5, echo = FALSE, warning=FALSE, fig.cap="Normal QQ plot of the errors of Miles traveled time series"}
 qqnorm(model$residuals)
 ```
 
@@ -954,7 +957,7 @@ In contrast, one should always keep in mind that sometimes the time series at ha
 
 As with the ARMA/ARIMA models we used it is important to check the distribution of the errors.
 
-```{r hy, fig.align='center', fig.width=12, fig.height=7, echo = FALSE, warning=FALSE, fig.cap="QQ norm plots and Shapiro test results"}
+```{r er2, fig.align='center', fig.width=7, fig.height=3.5, echo = FALSE, warning=FALSE, fig.cap="QQ norm plots and Shapiro test results"}
 par(mfrow=c(1,3))
 qqnorm(model$varresult$Gasoline$residuals,main="Gasoline")
 qqnorm(model$varresult$Crude$residuals,main="Crude")
@@ -963,14 +966,20 @@ to_shapiro<-data.frame(Series=0,Pi_Value=0,Conclusion=0)
 s_gas<-shapiro.test(model$varresult$Gasoline$residuals)
 s_cru<-shapiro.test(model$varresult$Crude$residuals)
 s_mil<-shapiro.test(model$varresult$RA_Miles$residuals)
-to_shapiro[1,]<-c("Gasoline",s_gas$p.value,0)
-to_shapiro[2,]<-c("Crude",s_cru$p.value,0)
-to_shapiro[3,]<-c("Miles",s_mil$p.value,0)
+to_shapiro[1,]<-c("Gasoline",round(s_gas$p.value,6),0)
+to_shapiro[2,]<-c("Crude",round(s_cru$p.value,6),0)
+to_shapiro[3,]<-c("Miles",round(s_mil$p.value,6),0)
 to_shapiro[as.numeric(to_shapiro[,2])<0.05,3]<-"Not normally distributed"
-to_shapiro
 ```
 
-As we can see the errors are not normally distributed, the plots suggest that this is again due to the outliers in the data. This shows a difficulty in predicting prices of real-world commodities as geopolitical, economic and even public health shocks can upend well established common sense expectations.
+```{r, echo = FALSE, fig.align='center', fig.cap="Results of the sharpio wilk normality test for the ARMA model"}
+knitr::kable(to_shapiro, 
+  caption = 'P value of the sharpio statistic Augmented Dickey-Fuller', 
+  col.names = c("Series name", "p-value", "Conclusion")
+)
+```
+
+As we can see the errors in figure \ref{fig:er2} are not normally distributed, the plots suggest that this is again due to the outliers in the data. This shows a difficulty in predicting prices of real-world commodities as geopolitical, economic and even public health shocks can upend well established common sense expectations.
 
 ## Fitting a VAR model with LASSO
 
@@ -1057,7 +1066,7 @@ The plots in figure \ref{fig:lass} show an almost perfect fit for the gasoline p
 
 Therefore, it is safe to assume that our penalized VAR model showed an overall better fit for two out of three time series but it somewhat failed to capture the structure of the RA_Miles when converting it back to its original values.
 
-```{r hy, fig.align='center', fig.width=12, fig.height=7, echo = FALSE, warning=FALSE, fig.cap="QQ norm plots and Shapiro test results"}
+```{r er3, fig.align='center', fig.width=7, fig.height=3.5, echo = FALSE, warning=FALSE, fig.cap="QQ norm plots and Shapiro test results"}
 to_shapiro<-data.frame(Series=0,Pi_Value=0,Conclusion=0)
 for(i in 1:3){
   to_shapiro[i,1]<-colnames(model.lasso$residuals)[i]
@@ -1072,10 +1081,16 @@ par(mfrow=c(1,3))
 for(i in 1:3){
   qqnorm(model.lasso$residuals[,i],main=colnames(model.lasso$residuals)[i])
 }
-to_shapiro
 ```
 
-We can again observe that the outliers in the data affect the quality of the model by creating outliers in the errors too.
+```{r, echo = FALSE, fig.align='center', fig.cap="Results of the sharpio wilk normality test for penalized ARMA model"}
+knitr::kable(to_shapiro, 
+  caption = 'P value of the sharpio wilk statistic', 
+  col.names = c("Series name", "p-value", "Conclusion")
+)
+```
+
+We can again observe in figure\ref{fig:er3} that the outliers in the data affect the quality of the model by creating outliers in the errors too.
 
 ## Conclusion
 
